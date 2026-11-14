@@ -531,8 +531,12 @@ function seed() {
   check('배포 주소에서는 하루에 한 번만 신호를 보냄', pings.length === 1, pings.length);
   check('신호에는 화면 주소만 있고 기록은 없음', /\/count\?p=%2Fmood%2F&rnd=\d+$/.test(pings[0] || ''), pings[0]);
   await page.evaluate(() => localStorage.removeItem('tide.count'));
-  await openSet(); await page.click('#sheet [data-act=countToggle]');
-  check('설정에서 끄면 이 폰은 세지 않음', (await store()).settings.noCount === true);
+  await openSet();
+  check('설정 화면에 방문 수 이야기는 없음', !/방문/.test(await page.textContent('#sheet')));
+  for (let i = 0; i < 4; i++) await page.click('#about');
+  check('버전 글자를 네 번 눌러서는 아무 일도 없음', !(await store()).settings.noCount);
+  await page.click('#about');
+  check('버전 글자를 다섯 번 누르면 이 폰은 세지 않음', (await store()).settings.noCount === true);
   await page.click('[data-act=close]'); await page.waitForTimeout(300);
   await visit('foreverclosemyeyes.github.io'); await page.waitForTimeout(200);
   check('꺼 둔 폰은 신호를 안 보냄', pings.length === 1, pings.length);

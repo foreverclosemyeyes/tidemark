@@ -205,6 +205,7 @@ textarea { display: block; font: inherit; font-size: calc(16px * var(--fs, 1.12)
 .txt.strong { font-weight: 600; text-align: right; }
 .txt.dim { color: var(--muted); font-size: calc(14px * var(--fs, 1.12)); text-align: right; }
 .foot { color: var(--faint); font-size: calc(11.5px * var(--fs, 1.12)); text-align: center; padding: 10px 12px 0; line-height: 1.45; }
+button.foot { display: block; width: 100%; }
 
 /* 주간 날짜 바 · 달력 */
 .weekbar { display: flex; align-items: center; margin: 0 -6px 16px; }

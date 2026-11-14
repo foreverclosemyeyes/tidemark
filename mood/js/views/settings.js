@@ -122,12 +122,9 @@ export function openSettings() {
     </ol></section>
     <p class="secnote">${DISCLAIMER} ${T('걱정되는 변화가 있으면 진료 때 이 기록을 보여 주며 이야기해 보세요.')}</p>
 
-    <div class="sec">${T('방문 수 세기')}</div>
-    <section class="card list"><button type="button" class="li sw" data-act="countToggle" aria-pressed="${!db.settings.noCount}"><span class="lk">${T('이 폰도 방문 수에 넣기')}</span><i></i></button></section>
-    <p class="secnote">${T('몇 명이 쓰는지 알려고, 앱을 연 날에 하루 한 번 “열었다”는 신호만 보내요. 기록 내용은 보내지 않아요. 끄면 이 폰은 세지 않아요.')}</p>
     `)}
 
-    <p class="foot" id="about">Tidemark ${VERSION} · ${standalone() ? T('홈 화면 앱') : T('브라우저')} · ${screen.width}×${screen.height} / ${innerWidth}×${innerHeight}</p>
+    <button type="button" class="foot" id="about" data-act="aboutTap">Tidemark ${VERSION} · ${standalone() ? T('홈 화면 앱') : T('브라우저')} · ${screen.width}×${screen.height} / ${innerWidth}×${innerHeight}</button>
   </div>`;
   showSheet();
 }

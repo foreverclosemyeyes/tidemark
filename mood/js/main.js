@@ -32,6 +32,8 @@ function commitDoses(list) {
 }
 
 // 설정 화면을 스크롤 자리를 지킨 채 다시 그린다
+let aboutTaps = [];   // 버전 글자를 누른 시각들 (aboutTap)
+
 // 인쇄할 한 장을 지금 기록으로 채운다 (단추를 누를 때와, 브라우저 메뉴로 인쇄할 때). 잠겨 있으면 비워 둔다.
 function fillPrintout() {
   $('#printout').innerHTML = $('.lock') ? '' : printoutHtml(clinicWeeks());
@@ -111,8 +113,17 @@ const actions = {
     toast(F('공황 {0}번째를 적었어요', e.panic));
   },
   welcomeNext: () => welcomeTo(1),
-  // 설정: 방문 수 세기에서 이 폰을 빼거나 다시 넣는다
-  countToggle: () => { db.settings.noCount = !db.settings.noCount; save(); redrawSettings(); },
+  // 방문 수 세기에서 이 폰을 빼거나 다시 넣는다: 설정 맨 아래의 버전 글자를 3초 안에 다섯 번 누른다.
+  // 스위치를 화면에 두면 쓰는 사람 모두에게 보여서, 앱 주인만 아는 방법으로 숨겨 두었다 (사용자가 정함, 2026-11-14).
+  aboutTap: () => {
+    const now = Date.now();
+    aboutTaps = aboutTaps.filter((t) => now - t < 3000).concat(now);
+    if (aboutTaps.length < 5) return;
+    aboutTaps = [];
+    db.settings.noCount = !db.settings.noCount;
+    save();
+    toast(db.settings.noCount ? T('이 폰은 방문 수에서 뺐어요') : T('이 폰을 방문 수에 다시 넣었어요'));
+  },
   // 병원·상담용 기능 켜고 끄기 (처음 안내의 물음, 설정의 스위치). 딸린 기록 항목도 한꺼번에 켜고 끈다.
   care: (el) => {
     const on = el.dataset.v ? el.dataset.v === '1' : !careOn(), off = (db.settings.off || []).filter((k) => !CARE_ITEMS.includes(k));
