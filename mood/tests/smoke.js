@@ -70,7 +70,7 @@ function seed() {
     if (up) fire('touchend', 200 + d, false);
   }, [sel, dx, release]);
   await drag('#sheet .welcome', -150, false);
-  check('안내를 끄는 동안 화면이 손가락을 따라옴', await page.evaluate(() => document.querySelector('#sheet').classList.contains('dragging') && document.querySelector('#sheet').style.getPropertyValue('--drag') === '-150.0px'));
+  check('안내를 끄는 동안 화면이 손가락을 따라옴', await page.evaluate(() => document.querySelector('#sheet').classList.contains('dragging') && document.querySelector('#sheet').style.getPropertyValue('--drag') === '-67.5px'));
   await page.evaluate(() => { const el = document.querySelector('#sheet .welcome'); el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [new Touch({ identifier: 1, target: el, clientX: 50, clientY: 300 })], bubbles: true })); });
   await page.waitForTimeout(450);
   check('안내를 왼쪽으로 밀면 둘째 장으로 넘어감', (await page.$$('#sheet [data-act=care][data-v]')).length === 2);
@@ -240,7 +240,7 @@ function seed() {
   check('오늘: 오른쪽으로 밀면 어제', (await text('h1')) !== '오늘');
   await swipe(-120); await swipe(-120);
   check('오늘: 왼쪽으로 밀면 다시 오늘, 미래로는 안 감', (await text('h1')) === '오늘');
-  await swipe(30);
+  await swipe(15);
   check('조금만 밀면 안 넘어감', (await text('h1')) === '오늘');
 
   // 5-2. 진료 탭: 다음 진료일, 말할 것, 요약
@@ -490,10 +490,10 @@ function seed() {
   // 오늘 화면을 끌면 내용이 따라오고, 조금만 밀고 떼면 날짜가 안 바뀌고 제자리로 돌아온다. 미래 쪽은 조금만 따라온다.
   await page.click('[data-tab=today]');
   const h1Before = await text('h1');
-  await drag('#app .tiles', 40); await page.waitForTimeout(300);
+  await drag('#app .tiles', 16); await page.waitForTimeout(300);
   check('조금만 밀고 떼면 날짜가 그대로이고 제자리로 돌아옴', (await text('h1')) === h1Before && !(await page.evaluate(() => document.querySelector('#app').classList.contains('dragging'))));
   await drag('#app .tiles', -200, false);
-  check('넘어갈 수 없는 쪽(내일)으로는 조금만 따라옴', await page.evaluate(() => document.querySelector('#app').style.getPropertyValue('--drag') === '-40.0px'));
+  check('넘어갈 수 없는 쪽(내일)으로는 조금만 따라옴', await page.evaluate(() => document.querySelector('#app').style.getPropertyValue('--drag') === '-24.0px'));
   await page.evaluate(() => { const el = document.querySelector('#app .tiles'); el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [new Touch({ identifier: 1, target: el, clientX: 0, clientY: 300 })], bubbles: true })); });
   await page.waitForTimeout(300);
   check('내일로는 안 넘어감', (await text('h1')) === h1Before);
