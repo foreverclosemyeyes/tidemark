@@ -11,14 +11,14 @@ const OUT_MS = 120;  // 넘어갈 때 밀려 나가는 시간 (app.css의 .settl
 const BACK_MS = 220; // 제자리로 돌아오는 시간
 
 // can(step): 그쪽으로 넘어갈 수 있는지. go(step): 넘긴다. step은 왼쪽으로 밀면 +1(다음), 오른쪽으로 밀면 -1(이전).
-// 밀리는 정도는 el의 CSS 변수 --drag(가로 이동), --drag-o(투명도)로 알려 주고, 실제로 움직이는 것은 app.css가 정한다.
+// 밀리는 정도는 el의 CSS 변수 --drag(가로 이동)로 알려 주고, 실제로 움직이는 것은 app.css가 정한다.
+// 흐려졌다 밝아지는 효과는 쓰지 않는다 (넘길 때마다 어두워졌다 밝아져서 눈이 피로하다고 했다).
 export function onSwipe(el, { can, go }) {
   let start = null, startAt = 0, locked = false, busy = false;
-  const set = (x, o) => { el.style.setProperty('--drag', `${x.toFixed(1)}px`); el.style.setProperty('--drag-o', o.toFixed(2)); };
+  const set = (x) => el.style.setProperty('--drag', `${x.toFixed(1)}px`);
   const clear = () => {
     el.classList.remove('dragging', 'settle');
     el.style.removeProperty('--drag');
-    el.style.removeProperty('--drag-o');
     busy = false;
   };
   const delta = (t) => [t.clientX - start.clientX, t.clientY - start.clientY];
@@ -26,7 +26,7 @@ export function onSwipe(el, { can, go }) {
   const settle = (step, pass) => {
     busy = true;
     el.classList.add('settle');
-    if (pass) set(-step * OUT_X, 0); else set(0, 1);
+    set(pass ? -step * OUT_X : 0);
     setTimeout(() => { clear(); if (pass) go(step); }, pass ? OUT_MS : BACK_MS);
   };
 
@@ -48,8 +48,7 @@ export function onSwipe(el, { can, go }) {
     }
     if (ev.cancelable) ev.preventDefault();   // 가로로 미는 동안에는 세로로 스크롤하지 않는다
     // 넘어갈 수 없는 쪽으로는 조금만 따라오게 해서 끝이라는 것을 알려 준다
-    const x = dx * (can(dx < 0 ? 1 : -1) ? FOLLOW : 0.12);
-    set(x, 1 - Math.min(Math.abs(x) / 120, 1) * 0.25);
+    set(dx * (can(dx < 0 ? 1 : -1) ? FOLLOW : 0.12));
   }, { passive: false });
   el.addEventListener('touchend', (ev) => {
     if (!start) return;
