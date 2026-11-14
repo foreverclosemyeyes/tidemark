@@ -469,6 +469,8 @@ input[type=date] { border: 0; outline: none; background: var(--card2); color: va
 .tr + .tr { border-top: 0.5px solid var(--line); }
 .tr span:first-child { color: var(--muted); }
 .tr span + span { font-family: var(--round); font-weight: 600; }
+.tbl.cols5 .tr { grid-template-columns: 1.15fr repeat(4, 1fr); grid-auto-flow: row; gap: 4px; }
+.flow-fig { display: block; overflow: visible; font-family: inherit; }
 .tr.th span { font-family: inherit; font-weight: 500; color: var(--muted); font-size: calc(12px * var(--fs, 1.12)); }
 .tr small { display: block; color: var(--faint); font-weight: 400; }
 

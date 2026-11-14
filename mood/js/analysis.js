@@ -209,66 +209,90 @@ export function recentState(entries = db.entries) {
   return { kind, title, flow, lead, points, notes: notes.slice(0, 2) };
 }
 
-// ---------- 숫자로 보기 ----------
-// 해석 없이 숫자만: 최근 7일과 그 전 4주를 나란히 놓은 표 (사용자가 정량적이고 객관적인 정보를 원했다, 2026-11-14).
-// 최근 7일 중 3일 이상 적었을 때만 나온다. 설정에서 꺼 둔 항목의 줄은 뺀다. [[이름, 최근 7일, 그 전 4주], …]
-export function numbers(entries = db.entries) {
-  const t = today(), mine = entries === db.entries;
-  const span = (from, to) => Object.keys(entries).sort().filter((k) => k > addDays(t, -from) && k <= addDays(t, -to)).map((k) => entries[k]);
-  const now = span(7, 0), base = span(35, 7);
-  if (now.length < 3) return [];
-  const vals = (list, key) => list.map((e) => e[key]).filter((x) => x != null);
-  const one = (x) => x.toFixed(1), dur = (m) => durText(Math.round(m));
-  // 평균 (가장 낮은 값–높은 값)
-  const mean = (list, key, fmt) => {
-    const v = vals(list, key), end = (x) => (fmt === one ? String(x) : fmt(x));   // 0~10 점수의 범위는 "4–6"처럼 소수점 없이
-    return v.length ? `${fmt(avg(v))}<small>${end(Math.min(...v))}–${end(Math.max(...v))}</small>` : '–';
+// ---------- 견주어 보기: 생리 전후, 약을 안 먹은 다음 날 ----------
+// 가상 사용자 8명의 기록으로 여러 후보를 시험해 보고 사용자가 이 둘만 남겼다 (2026-11-14).
+// "며칠 중 며칠" 식의 숫자 표와 잠·요일·카페인 비교는 도움이 안 된다고 해서 뺐다. 진료 탭에 이미 있는 것과 겹치지 않게 한다.
+const nextDay = (entries, date) => entries[addDays(date, 1)];
+const hm = (m) => { const x = Math.round(m); return `${Math.floor(x / 60)}:${String(x % 60).padStart(2, '0')}`; };
+
+// 생리 전후: 시작 전 닷새 · 생리 중 · 끝난 뒤 닷새 · 그 밖의 날을 나란히 놓는다. 최근 반년에서, 시작한 날을 아는 생리가 2번 이상일 때만.
+// 차이가 뚜렷한 줄만 보여 준다 (0~10 점수 0.8, 증상 단계 0.6, 잠 30분 이상. 이 기준은 내가 정했다). 무리마다 3일 이상 적은 값만 쓴다.
+// 돌려주는 것: { cycles, head: [무리마다 적은 날 수], rows: [[이름, 전, 중, 뒤, 그 밖], …] } 또는 null
+export function periodPhases(entries = db.entries) {
+  const t = today(), keys = Object.keys(entries).filter((k) => k > addDays(t, -183) && k <= t).sort();
+  // 시작한 날: 생리 중인 날인데, 바로 앞(사흘 안)에 적은 날이 생리 중이 아닐 때. 앞에 적은 날이 없으면 시작한 날인지 알 수 없어 뺀다.
+  const before = (k) => [1, 2, 3].map((i) => entries[addDays(k, -i)]).find(Boolean);
+  const starts = keys.filter((k) => entries[k].period && before(k) && !before(k).period);
+  if (starts.length < 2) return null;
+  const ends = keys.filter((k) => entries[k].period && !(nextDay(entries, k) || {}).period);
+  const near = (k, list, sign) => list.some((s) => { const g = dayGap(k, s) * sign; return g >= 1 && g <= 5; });
+  const groups = [[], [], [], []];
+  keys.forEach((k) => { const e = entries[k]; groups[e.period ? 1 : near(k, starts, 1) ? 0 : near(k, ends, -1) ? 2 : 3].push(e); });
+  const row = (on, name, key, gap, fmt) => {
+    if (!on) return [];
+    const m = groups.map((g) => { const v = g.map((e) => e[key]).filter((x) => x != null); return v.length >= 3 ? avg(v) : null; }), have = m.filter((x) => x != null);
+    return m[0] != null && have.length >= 3 && Math.max(...have) - Math.min(...have) >= gap ? [[name, ...m.map((x) => (x == null ? '–' : fmt(x)))]] : [];
   };
-  // 밤마다 잠이 얼마나 들쭉날쭉한지 (표준편차)
-  const spread = (list) => { const v = vals(list, 'sleepMin'); if (v.length < 3) return '–'; const m = avg(v); return `±${dur(Math.sqrt(avg(v.map((x) => (x - m) ** 2))))}`; };
-  // 잠든 시각의 평균 (자정을 넘긴 시각은 다음 날로 이어서 센다)
-  const bed = (list) => {
-    const v = list.filter((e) => e.bed).map((e) => { const [h, m] = e.bed.split(':').map(Number); return h * 60 + m + (h < 12 ? 1440 : 0); });
-    if (v.length < 3) return '–';
-    const a = Math.round(avg(v)) % 1440;
-    return `${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`;
-  };
-  // 그런 날이 며칠인지: "2/7일" (그 값을 적은 날 가운데)
-  const days = (list, key, test) => { const v = list.filter((e) => e[key] != null); return v.length ? F('{0}/{1}일', v.filter(test).length, v.length) : '–'; };
-  const took = (list) => (list.length ? F('{0}/{1}일', list.filter((e) => medsFor(e.date).length).length, list.length) : '–');
-  const row = (on, name, f) => (on ? [[name, f(now), f(base)]] : []);
-  return [
-    ...row(itemOn('mood'), T('기분'), (l) => mean(l, 'mood', one)),
-    ...row(itemOn('energy'), T('에너지'), (l) => mean(l, 'energy', one)),
-    ...row(itemOn('conf'), T('자신감'), (l) => mean(l, 'conf', one)),
-    ...row(itemOn('sleep'), T('잠'), (l) => mean(l, 'sleepMin', dur)),
-    ...row(itemOn('sleep'), T('잠의 들쭉날쭉'), spread),
-    ...row(itemOn('sleep'), T('잠든 시각'), bed),
-    ...row(itemOn('sleep'), T('5시간 미만 밤'), (l) => days(l, 'sleepMin', (e) => e.sleepMin < SHORT_SLEEP)),
-    ...row(itemOn('dep'), T('우울이 보통 이상'), (l) => days(l, 'dep', (e) => e.dep >= 2)),
-    ...row(itemOn('anx'), T('불안이 보통 이상'), (l) => days(l, 'anx', (e) => e.anx >= 2)),
-    ...row(itemOn('panic') && [...now, ...base].some((e) => e.panic), T('공황'), (l) => F('{0}번', l.reduce((n, e) => n + (e.panic || 0), 0))),
-    ...row(itemOn('meds') && mine && db.meds.length > 0, T('약 먹은 날'), took),
-    [T('적은 날'), F('{0}/{1}일', now.length, 7), F('{0}/{1}일', base.length, 28)],
-  ].filter(([, a, b]) => a !== '–' || b !== '–');
+  const one = (x) => x.toFixed(1);
+  const rows = [...row(itemOn('mood'), T('기분'), 'mood', 0.8, one), ...row(itemOn('energy'), T('에너지'), 'energy', 0.8, one), ...row(itemOn('dep'), T('우울'), 'dep', 0.6, one),
+    ...row(itemOn('anx'), T('불안'), 'anx', 0.6, one), ...row(itemOn('sleep'), T('잠'), 'sleepMin', 30, hm)];
+  return rows.length ? { cycles: starts.length, head: groups.map((g) => g.length), rows } : null;
 }
 
-// 잠을 적게 잔 날과 그 밖의 날: 최근 8주에서, 내 평균보다 1시간 넘게 적게 자고 일어난 날의 기분·에너지·불안을 나머지 날과 나란히 놓는다.
-// 잠이 줄면 그날·다음 날의 기분과 죽고 싶은 생각이 나빠진다는 연구가 있다 [근거 11]. "1시간"과 "각각 4일·8일 이상"은 내가 정했다.
-// 돌려주는 것: { short: 적게 잔 날 수, rest: 그 밖의 날 수, rows: [[이름, 적게 잔 날, 그 밖의 날], …] } 또는 null
-export function shortSleepDays(entries = db.entries) {
-  const t = today(), list = Object.keys(entries).filter((k) => k > addDays(t, -56) && k <= t).map((k) => entries[k]).filter((e) => e.sleepMin != null);
-  if (list.length < 12) return null;
-  const mean = avg(list.map((e) => e.sleepMin)), short = list.filter((e) => e.sleepMin < mean - 60), rest = list.filter((e) => e.sleepMin >= mean - 60);
-  if (short.length < 4 || rest.length < 8) return null;
-  const num = (l, key) => { const v = l.map((e) => e[key]).filter((x) => x != null); return v.length ? avg(v).toFixed(1) : '–'; };
-  const days = (l, key, test) => { const v = l.filter((e) => e[key] != null); return v.length ? F('{0}/{1}일', v.filter(test).length, v.length) : '–'; };
-  const row = (on, name, f) => (on ? [[name, f(short), f(rest)]] : []);
-  const rows = [
-    ...row(itemOn('mood'), T('기분'), (l) => num(l, 'mood')), ...row(itemOn('energy'), T('에너지'), (l) => num(l, 'energy')),
-    ...row(itemOn('dep'), T('우울이 보통 이상'), (l) => days(l, 'dep', (e) => e.dep >= 2)), ...row(itemOn('anx'), T('불안이 보통 이상'), (l) => days(l, 'anx', (e) => e.anx >= 2)),
-  ].filter(([, a, b]) => a !== '–' && b !== '–');
-  return rows.length ? { short: short.length, rest: rest.length, rows } : null;
+// 약을 안 먹은 다음 날: 그 무렵(앞뒤 일주일)의 약 먹은 날들과 견준다. 최근 8주, 내 기록에서만.
+// 그냥 "안 먹은 날"과 "먹은 날"의 평균을 견주면 거꾸로 읽힌다: 들뜬 시기에는 약을 빼먹기 쉽고 기분은 높아서, 약을 안 먹으면 기분이 좋아지는 것처럼 보인다.
+// 그래서 (1) 들뜬 시기의 날은 빼고, (2) 전체 평균이 아니라 그 무렵의 약 먹은 날들을 기준으로 삼는다 (천천히 나아지거나 가라앉는 흐름이 섞이지 않게).
+// 4번 이상이고 차이가 뚜렷한 줄만 (0~10 점수 0.7, 불안 0.5, 잠 30분. 내가 정한 기준). 돌려주는 것: { n, rows: [[이름, 차이 글], …] } 또는 null
+export function missedMeds() {
+  if (!db.meds.length) return null;
+  const E = db.entries, t = today(), keys = Object.keys(E).filter((k) => k > addDays(t, -56) && k < t).sort();
+  const took = (k) => medsFor(k).length > 0, high = runs(E, upDay), inHigh = (k) => high.some((r) => k >= r.start && k <= r.end);
+  const first = Object.keys(E).sort().find(took);
+  if (!first) return null;
+  const missed = keys.filter((k) => k > first && !took(k) && !inHigh(k) && E[addDays(k, 1)]);
+  const diffs = { mood: [], energy: [], anx: [], sleepMin: [] };
+  missed.forEach((k) => {
+    // 그 무렵의 기준: 앞뒤 일주일에서 약을 먹었고, 그 전날에도 약을 먹은 날들
+    const base = keys.filter((d) => Math.abs(dayGap(k, d)) <= 7 && d !== k && took(d) && took(addDays(d, -1)) && !inHigh(d)).map((d) => E[d]);
+    Object.keys(diffs).forEach((key) => {
+      const v = E[addDays(k, 1)][key], b = base.map((e) => e[key]).filter((x) => x != null);
+      if (v != null && b.length >= 4) diffs[key].push(v - avg(b));
+    });
+  });
+  const say = (d, fmt) => F(d < 0 ? '{0} 낮음' : '{0} 높음', fmt(Math.abs(d)));
+  const row = (on, name, key, gap, fmt, word) => {
+    const v = diffs[key];
+    if (!on || v.length < 4 || Math.abs(avg(v)) < gap) return [];
+    return [[name, word ? F(avg(v) < 0 ? '{0} 짧음' : '{0} 김', fmt(Math.abs(avg(v)))) : say(avg(v), fmt)]];
+  };
+  const one = (x) => x.toFixed(1);
+  const rows = [...row(itemOn('mood'), T('기분'), 'mood', 0.7, one), ...row(itemOn('energy'), T('에너지'), 'energy', 0.7, one), ...row(itemOn('anx'), T('불안'), 'anx', 0.5, one),
+    ...row(itemOn('sleep'), T('그날 밤 잠'), 'sleepMin', 30, (m) => durText(Math.round(m)), true)];
+  return rows.length ? { n: Math.max(...Object.values(diffs).map((v) => v.length)), rows } : null;
+}
+
+// ---------- 메모: 기분이 낮았던 날과 높았던 날에 적어 둔 말 ----------
+// 앱이 글의 뜻을 읽지는 못한다. 대신 그날의 숫자 옆에 내가 쓴 말을 다시 보여 준다. 최근 8주, 메모와 기분을 함께 적은 날에서
+// 기분 4 이하인 날 가운데 가장 낮은 사흘, 7 이상인 날 가운데 가장 높은 사흘. { low: [entry, …], high: [entry, …] }
+export function moodNotes(entries = db.entries) {
+  const t = today(), list = Object.keys(entries).filter((k) => k > addDays(t, -56) && k <= t).map((k) => entries[k]).filter((e) => e.note && e.mood != null);
+  const pick = (test, dir) => list.filter(test).sort((a, b) => (a.mood - b.mood) * dir || (a.date < b.date ? 1 : -1)).slice(0, 3);
+  return { low: pick((e) => e.mood <= 4, 1), high: pick((e) => e.mood >= 7, -1) };
+}
+
+// ---------- 긴 흐름: 주마다의 기분 평균 (최근 1년) ----------
+// 조울의 주기는 몇 달씩 이어지기도 해서 (우울 반년, 들뜸 석 달 같은) 주·월 단위 그래프로는 안 보인다. 그래서 한 해를 한눈에 본다.
+// 이틀 이상 적은 주만 점으로 친다. 그런 주가 10주 이상일 때만 나온다. [{ start: 그 주 월요일, mood: 평균 또는 null }, …] (오래된 주부터) 또는 null
+export function longFlow(entries = db.entries) {
+  const t = today(), keys = Object.keys(entries).sort();
+  if (!keys.length) return null;
+  const mondayOf = (k) => addDays(k, -((parse(k).getDay() + 6) % 7));
+  const from = keys[0] > addDays(t, -363) ? mondayOf(keys[0]) : mondayOf(addDays(t, -357)), weeks = [];
+  for (let w = from; w <= t; w = addDays(w, 7)) {
+    const v = [0, 1, 2, 3, 4, 5, 6].map((i) => entries[addDays(w, i)]).filter((e) => e && e.mood != null).map((e) => e.mood);
+    weeks.push({ start: w, mood: v.length >= 2 ? avg(v) : null });
+  }
+  return weeks.filter((w) => w.mood != null).length >= 10 ? weeks : null;
 }
 
 // ---------- 약을 바꾼 앞뒤 ----------

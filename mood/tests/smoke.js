@@ -398,8 +398,27 @@ function seed() {
   await page.click('[data-act=close]');
   await put(seed());
   await page.click('[data-tab=insight]');
-  const numRows = await page.$$eval('.nums >> nth=0 >> .tr', (els) => els.map((x) => x.textContent));
-  check('인사이트에 숫자 표가 나옴 (최근 7일 · 그 전 4주, 기분·잠 줄)', numRows.length >= 5 && /최근 7일/.test(numRows[0]) && numRows.some((x) => x.startsWith('기분')) && numRows.some((x) => x.startsWith('잠의 들쭉날쭉')), numRows.join(' | '));
+  check('인사이트에 숫자 표(며칠 중 며칠)는 없음', !(await page.$('.nums')));
+  // 생리 전후 · 약을 안 먹은 다음 날 · 긴 흐름 · 기분이 낮았던 날의 메모
+  const made = await page.evaluate(() => {
+    const pad = (n) => String(n).padStart(2, '0'), day = (i) => { const d = new Date(); d.setDate(d.getDate() - i); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    const d = JSON.parse(localStorage.getItem('tide.v1')), med = { name: '브린텔릭스', dose: '10mg' };
+    d.entries = {}; d.meds = [med]; d.taken = {};
+    for (let i = 119; i >= 0; i--) {
+      const phase = (119 - i + 6) % 28, period = phase < 5, pre = phase >= 23, missed = i % 9 === 4, afterMissed = (i + 1) % 9 === 4;
+      d.entries[day(i)] = { date: day(i), mood: (pre ? 3 : 6) - (afterMissed ? 2 : 0), energy: (pre ? 4 : 6) - (afterMissed ? 2 : 0), conf: 5, dep: pre ? 3 : 1, anx: pre ? 2 : 1, si: 0, sleepMin: 430, period,
+        meds: missed ? [] : [med], signs: {}, note: i === 3 ? '아무것도 하기 싫었음' : '' };
+    }
+    localStorage.setItem('tide.v1', JSON.stringify(d));
+    return true;
+  });
+  await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=insight]');
+  const insightText = made && await page.textContent('#app');
+  check('생리 전후 표가 나옴 (전 5일의 기분이 낮게)', /생리 전후 · 최근 \d번/.test(insightText) && (await page.$$eval('.cols5 .tr', (els) => els.map((x) => x.textContent))).some((x) => /^기분[23]\.\d/.test(x)), insightText.slice(0, 400));
+  check('약을 안 먹은 다음 날이 그 무렵 평소와 견주어 나옴', /약을 안 먹은 다음 날/.test(insightText) && /기분\d\.\d 낮음/.test(insightText));
+  check('긴 흐름 그림이 나옴', !!(await page.$('svg.flow-fig path')));
+  check('기분이 낮았던 날의 메모가 나옴', /기분이 낮았던 날의 메모/.test(insightText) && insightText.includes('아무것도 하기 싫었음'));
+  await page.click('[data-tab=today]');
   await openSet();
   check('설정에 진단명이 없음', !(await page.$('#sheet [data-act=dx]')) && !/진단명/.test(await page.textContent('#sheet')));
   await page.click('[data-act=close]'); await page.waitForTimeout(300);
