@@ -501,6 +501,24 @@ function seed() {
   check('충분히 끌고 떼면 전날로 넘어감', (await text('h1')) !== h1Before);
   await page.click('[data-act=goToday]');
 
+  // 방문 수 세기: 배포 주소에서만, 하루에 한 번, 기록 없이 신호만 보낸다. 설정에서 끄면 안 보낸다.
+  const pings = [];
+  await page.route('https://tide-mark.goatcounter.com/**', (route) => { pings.push(route.request().url()); route.fulfill({ status: 200, contentType: 'image/gif', body: Buffer.from('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==', 'base64') }); });
+  const visit = (host) => page.evaluate(async (h) => { const m = await import('./js/count.js'); m.countVisit(h); }, host);
+  await page.evaluate(() => localStorage.removeItem('tide.count'));
+  await visit('localhost'); await page.waitForTimeout(100);
+  check('시험 주소에서는 방문을 세지 않음', pings.length === 0);
+  await visit('foreverclosemyeyes.github.io'); await visit('foreverclosemyeyes.github.io'); await page.waitForTimeout(200);
+  check('배포 주소에서는 하루에 한 번만 신호를 보냄', pings.length === 1, pings.length);
+  check('신호에는 화면 주소만 있고 기록은 없음', /\/count\?p=%2Fmood%2F&rnd=\d+$/.test(pings[0] || ''), pings[0]);
+  await page.evaluate(() => localStorage.removeItem('tide.count'));
+  await openSet(); await page.click('#sheet [data-act=countToggle]');
+  check('설정에서 끄면 이 폰은 세지 않음', (await store()).settings.noCount === true);
+  await page.click('[data-act=close]'); await page.waitForTimeout(300);
+  await visit('foreverclosemyeyes.github.io'); await page.waitForTimeout(200);
+  check('꺼 둔 폰은 신호를 안 보냄', pings.length === 1, pings.length);
+  await page.unroute('https://tide-mark.goatcounter.com/**');
+
   // 오늘 화면의 네 칸은 수면에 "평소 …"가 붙어도 높이가 같다
   const tileH = await page.$$eval('.tile', (els) => els.map((x) => Math.round(x.getBoundingClientRect().height)));
   check('오늘 화면의 네 칸 높이가 모두 같음', tileH.length === 4 && new Set(tileH).size === 1 && !(await page.$('.tile .ts')), tileH.join());

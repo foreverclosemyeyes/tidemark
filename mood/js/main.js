@@ -6,6 +6,7 @@ import { exportData, giveFile, hasAlarms, importData, makeIcs, remind, snoozeBac
 import { F, T } from './i18n.js';
 import { lockNow, removePin, setPin } from './lock.js';
 import { addDose, medKey, medsFor, normDose, setMeds, sugHtml, toggleDoseTime } from './meds.js';
+import { countVisit } from './count.js';
 import { render } from './render.js';
 import { onSwipe } from './swipe.js';
 import { clinicView, standalone, trend, ui } from './state.js';
@@ -110,6 +111,8 @@ const actions = {
     toast(F('공황 {0}번째를 적었어요', e.panic));
   },
   welcomeNext: () => welcomeTo(1),
+  // 설정: 방문 수 세기에서 이 폰을 빼거나 다시 넣는다
+  countToggle: () => { db.settings.noCount = !db.settings.noCount; save(); redrawSettings(); },
   // 병원·상담용 기능 켜고 끄기 (처음 안내의 물음, 설정의 스위치). 딸린 기록 항목도 한꺼번에 켜고 끈다.
   care: (el) => {
     const on = el.dataset.v ? el.dataset.v === '1' : !careOn(), off = (db.settings.off || []).filter((k) => !CARE_ITEMS.includes(k));
@@ -348,6 +351,7 @@ $('#importFile').addEventListener('change', (ev) => {
 // 자정을 넘긴 뒤 앱으로 돌아오면 '오늘'을 새로 계산
 let lastDay = today();
 document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) countVisit();
   if (document.hidden || today() === lastDay) return;
   if (ui.selected === lastDay) ui.selected = today();
   lastDay = today();
@@ -364,6 +368,7 @@ applyTheme();
 applyFont();
 render();
 if (careUnasked()) openWelcome();
+countVisit();
 // 잠금: 열 때 가리고, 다른 앱으로 나갈 때도 바로 가려서 앱 전환 화면에 기록이 비치지 않게 한다
 lockNow();
 document.addEventListener('visibilitychange', () => { if (document.hidden) lockNow(); });
