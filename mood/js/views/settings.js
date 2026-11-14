@@ -12,19 +12,15 @@ import { careOn, customDefs, db, itemOn, usesOn } from '../store.js';
 import { ACCENTS, accentKey, isLight } from '../theme.js';
 
 // ---------- 설정·백업 ----------
-// 설정은 기능별 묶음으로 나눠 접어 둔다. 묶음 이름을 누르면 그 안이 펼쳐진다 (펼친 묶음은 ui.setOpen에 기억).
-const GROUPS = () => ({
-  rec: [T('기록할 것'), T('진단명 · 기록 항목 · 내 항목 · 약')],
-  look: [T('화면'), T('언어 · 화면 모드 · 색 · 글씨')],
-  remind: [T('알림'), T('기록 알림 · 캘린더')],
-  data: [T('백업 · 잠금'), daysSinceBackup() == null ? T('아직 백업한 적이 없어요.') : F('마지막 백업: {0}일 전.', daysSinceBackup())],
-  help: [T('도움말'), T('홈 화면에 추가하는 방법')],
-});
-function group(key, body) {
-  const [name, sub] = GROUPS()[key], open = ui.setOpen.includes(key);
-  return `<button type="button" class="card grp" data-act="setGroup" data-g="${key}" aria-expanded="${open}">
-      <span><b>${name}</b><small>${sub}</small></span><i class="chev"></i></button>${open ? `<div class="grp-in">${body}</div>` : ''}`;
-}
+// 설정은 기능별로 나눠 위쪽의 가로 탭으로 오간다 (지금 탭은 ui.setTab). 길게 한 줄로 늘어놓거나 접어 두면 찾기 불편하다고 해서 바꿨다.
+// 탭마다 내용은 전부 그려 두고, 지금 탭이 아닌 것은 숨긴다.
+const TABS = () => [['rec', T('기록')], ['look', T('화면')], ['remind', T('알림')], ['data', T('백업 · 잠금')], ['help', T('도움말')]];
+const tabsHtml = () => `<div class="settabs" role="tablist">${TABS().map(([key, name]) =>
+  `<button type="button" role="tab" data-act="setTab" data-g="${key}" aria-selected="${ui.setTab === key}">${name}</button>`).join('')}</div>`;
+const group = (key, body) => `<div class="setpane" data-pane="${key}"${ui.setTab === key ? '' : ' hidden'}>${body}</div>`;
+
+// 화면 머리말 오른쪽의 설정 단추 (네 탭 모두에 있다)
+export const settingsButton = () => `<button class="icon-btn" data-act="settings" aria-label="${T('설정과 백업')}">${IC.sliders}</button>`;
 
 export function openSettings() {
   const n = Object.keys(db.entries).length;
@@ -44,9 +40,10 @@ export function openSettings() {
       <div class="st"><b>${T('설정')}</b><span>${F('기록 {0}일', n)}</span></div>
       <button class="txt strong" data-act="close">${T('완료')}</button>
     </div>
+    ${tabsHtml()}
 
     ${group('rec', `
-    <section class="card list" style="margin-top:12px"><button type="button" class="li sw" data-act="care" aria-pressed="${careOn()}"><span class="lk">${T('병원 · 상담용 기능')}</span><i></i></button></section>
+    <section class="card list"><button type="button" class="li sw" data-act="care" aria-pressed="${careOn()}"><span class="lk">${T('병원 · 상담용 기능')}</span><i></i></button></section>
     <p class="secnote">${T('끄면 증상 · 약 · 부작용 항목과 인사이트 · 진료 화면이 숨겨져요. 적어 둔 기록은 지워지지 않고, 다시 켜면 그대로 나와요. 항목은 아래에서 하나씩 따로 켤 수도 있어요.')}</p>
 
     ${careOn() ? `<div class="sec">${T('진단명')}</div>

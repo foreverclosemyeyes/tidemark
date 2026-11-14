@@ -43,10 +43,10 @@ function seed() {
   const url = `http://localhost:${server.address().port}/`;
   const browser = await chromium.launch();
   const page = await (await browser.newContext({ ...devices['iPhone 14'], deviceScaleFactor: 1, colorScheme: 'dark' })).newPage();
-  // 설정을 열고 접힌 묶음을 모두 펼친다
+  // 설정을 열고, 확인하기 쉽게 모든 탭의 내용을 한꺼번에 펼쳐 둔다 (탭을 오가는 것은 아래에서 따로 확인한다)
   const openSet = async () => {
-    await page.click('[data-act=settings]');
-    for (const g of ['rec', 'look', 'remind', 'data', 'help']) await page.click(`[data-g=${g}]`);
+    await page.click('#app .top [data-act=settings]');
+    await page.evaluate(() => { if (!document.querySelector('#test-allpanes')) document.head.insertAdjacentHTML('beforeend', '<style id="test-allpanes">#sheet .setpane[hidden] { display: block !important; }</style>'); });
   };
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -410,11 +410,19 @@ function seed() {
   await page.click('[data-tab=insight]');
   const stateText = await page.textContent('.state');
   check('우울증만 골랐어도 들뜬 모습을 걸러 내지 않고, 진단명에 없는 모습이라고 짚어 줌', /hypomania|경조증/.test(stateText) && /not among the chosen diagnoses|고른 진단명에 조울증은 없지만/.test(stateText));
-  // 설정은 기능별 묶음으로 접혀 있고, 누른 묶음만 펼쳐진다
-  await page.click('[data-tab=today]'); await page.click('[data-act=settings]');
-  check('설정을 열면 묶음 다섯 개가 접혀 있음', (await page.$$('#sheet .grp')).length === 5 && !(await page.$('#sheet [data-act=dx]')) && !(await page.$('#sheet [data-act=export]')));
-  await page.click('[data-g=rec]');
-  check('묶음을 누르면 그 안만 펼쳐짐', !!(await page.$('#sheet [data-act=dx]')) && !(await page.$('#sheet [data-act=export]')));
+  // 설정은 가로 탭으로 나뉘어 있고, 고른 탭의 내용만 보인다. 흐름·인사이트·진료 화면에서도 설정을 열 수 있다.
+  await page.evaluate(() => { const st = document.querySelector('#test-allpanes'); if (st) st.remove(); });
+  for (const tab of ['trend', 'insight', 'clinic']) {
+    await page.click(`[data-tab=${tab}]`);
+    await page.click('#app .top [data-act=settings]');
+    check(`${tab} 화면에서도 설정이 열림`, (await page.$$('#sheet .settabs button')).length === 5);
+    await page.click('#sheet [data-act=close]'); await page.waitForTimeout(300);
+  }
+  await page.click('[data-tab=today]'); await page.click('#app .top [data-act=settings]');
+  check('설정을 열면 기록 탭만 보임', await page.isVisible('#sheet [data-act=dx]') && await page.isHidden('#sheet [data-act=export]'));
+  await page.click('#sheet [data-act=setTab][data-g=data]');
+  check('탭을 누르면 그 탭의 내용으로 바뀜', await page.isHidden('#sheet [data-act=dx]') && await page.isVisible('#sheet [data-act=export]'));
+  await page.click('#sheet [data-act=setTab][data-g=rec]');
   // 약은 종류를 먼저 고르고, 영어 성분 이름으로도 찾을 수 있다
   await page.click('[data-act=addMed]');
   check('약을 더할 때 종류 일곱 가지가 먼저 보임', (await page.$$('#med-sug .sug.cat')).length === 7);

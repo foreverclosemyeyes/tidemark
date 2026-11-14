@@ -9,6 +9,7 @@ import { doseRowsHtml, medsFor, medsText } from '../meds.js';
 import { standalone, ui } from '../state.js';
 import { careOn, customDefs, db, itemOn } from '../store.js';
 import { moodFill, tone } from '../theme.js';
+import { settingsButton } from './settings.js';
 
 // ---------- 오늘 화면 ----------
 // 목록 한 줄. focus를 주면 누를 수 있는 줄이 되고, 기록 화면이 그 항목만 띄운 채 열린다.
@@ -44,7 +45,7 @@ export function viewToday() {
   app.innerHTML = `
     <header class="top">
       <div><div class="over">${sel === t ? longDate(sel) : T('지난 기록')}</div><h1>${sel === t ? T('오늘') : longDate(sel)}</h1></div>
-      <button class="icon-btn" data-act="settings" aria-label="${T('설정과 백업')}">${IC.sliders}</button>
+      ${settingsButton()}
     </header>
     ${intro}${hint}${sel === t ? backup : ''}
     ${sel === t && e && e.si >= SI_CARE_FROM ? `<div class="card signal"><i></i><span>${F('죽고 싶은 생각이 강한 날이에요. 혼자 버티지 않아도 돼요. {0}에 전화하거나 다니는 병원에 연락해 보세요.',

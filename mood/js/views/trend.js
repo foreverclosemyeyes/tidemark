@@ -7,6 +7,7 @@ import { IC } from '../icons.js';
 import { trend } from '../state.js';
 import { db, itemOn } from '../store.js';
 import { fontScale, moodFill, tone } from '../theme.js';
+import { settingsButton } from './settings.js';
 
 export function trendRange(anchor) {
   if (trend.mode === 'week') return { start: weekStart(anchor), n: 7 };
@@ -178,8 +179,8 @@ export function viewTrend() {
 
   app.innerHTML = `
     <header class="top"><div><div class="over">${F('기록 {0}일 / {1}일', got.length, r.n)}</div><h1>${T('흐름')}</h1></div>
-      <div class="segc"><button data-act="mode" data-mode="week" aria-pressed="${isWeek}">${EN ? 'Week' : T('주')}</button>
-        <button data-act="mode" data-mode="month" aria-pressed="${!isWeek}">${EN ? 'Month' : T('월')}</button></div></header>
+      <div class="top-r"><div class="segc"><button data-act="mode" data-mode="week" aria-pressed="${isWeek}">${EN ? 'Week' : T('주')}</button>
+        <button data-act="mode" data-mode="month" aria-pressed="${!isWeek}">${EN ? 'Month' : T('월')}</button></div>${settingsButton()}</div></header>
     <div class="pnav">
       <button data-act="shift" data-step="-1" aria-label="${T('이전')}">‹</button><span>${title}</span>
       <button data-act="shift" data-step="1" aria-label="${T('다음')}" ${shiftAnchor(r.start, 1) > t ? 'disabled' : ''}>›</button></div>

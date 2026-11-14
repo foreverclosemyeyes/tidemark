@@ -9,6 +9,7 @@ import { sampleClinic } from '../sample.js';
 import { clinicView, ui } from '../state.js';
 import { customDefs, db, itemOn } from '../store.js';
 import { tone } from '../theme.js';
+import { settingsButton } from './settings.js';
 import { li } from './today.js';
 import { smoothPath } from './trend.js';
 
@@ -252,7 +253,7 @@ export function viewClinic() {
   const range = (w, label) => `<button data-act="clinicWeeks" data-w="${w}" aria-pressed="${pick === w}">${label}</button>`;
   app.innerHTML = `
     <header class="top"><div><div class="over">${nextText() || T('의사에게 보여 줄 것들')}</div><h1>${T('진료')}</h1></div>
-      <div class="segc">${range(1, T('1주'))}${range(2, T('2주'))}${range(4, T('4주'))}${lastVisit() ? range('since', T('진료 후')) : ''}</div></header>
+      <div class="top-r"><div class="segc">${range(1, T('1주'))}${range(2, T('2주'))}${range(4, T('4주'))}${lastVisit() ? range('since', T('진료 후')) : ''}</div>${settingsButton()}</div></header>
 
     ${demo ? `<section class="card hint"><div><b>${T('예시 기록으로 만든 진료용 요약이에요.')}</b><br>${T('매일 적어 두면 내 기록으로 이렇게 정리돼요. 만들어 낸 예시라 저장되지 않아요.')}
         <button class="mini" data-act="demo" style="display:block;margin-top:10px">${T('예시 닫기')}</button></div></section>`

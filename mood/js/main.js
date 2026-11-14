@@ -196,12 +196,8 @@ const actions = {
   sleepOn: () => { ui.draft.sleepSet = true; $('#sleep').innerHTML = sleepHtml(); syncForm(); },
   sleepOff: () => { ui.draft.sleepSet = false; ui.draft.tired = false; $('#sleep').innerHTML = sleepHtml(); },
   clearField: (el) => { ui.draft[el.dataset.k] = null; syncForm(); },
-  settings: () => { ui.setOpen = []; openSettings(); },
-  setGroup: (el) => {
-    const g = el.dataset.g;
-    ui.setOpen = ui.setOpen.includes(g) ? ui.setOpen.filter((x) => x !== g) : ui.setOpen.concat(g);
-    redrawSettings();
-  },
+  settings: () => { ui.setTab = 'rec'; openSettings(); },
+  setTab: (el) => { ui.setTab = el.dataset.g; openSettings(); },
   close: closeSheet,
   save: saveEntry,
   deleteEntry: () => {
@@ -217,7 +213,7 @@ const actions = {
   },
   medGroup: (el) => { ui.medGroup = el.dataset.g; $('#med-sug').innerHTML = sugHtml(''); },
   pickSug: (el) => { $('#med-name').value = el.dataset.name; $('#med-sug').innerHTML = ''; $('#med-dose').focus(); },
-  medSetup: () => { ui.addingMed = true; ui.setOpen = ['rec']; openSettings(); $('#sec-meds').scrollIntoView(); },
+  medSetup: () => { ui.addingMed = true; ui.setTab = 'rec'; openSettings(); $('#sec-meds').scrollIntoView(); },
   saveMed: () => {
     const name = $('#med-name').value.trim(), dose = normDose($('#med-dose').value);
     if (!name) { toast(T('약 이름을 적어 주세요')); return; }

@@ -9,6 +9,7 @@ import { IC } from '../icons.js';
 import { sampleEntries } from '../sample.js';
 import { ui } from '../state.js';
 import { db } from '../store.js';
+import { settingsButton } from './settings.js';
 
 const bullets = (list) => (list.length ? `<ul>${list.map((x) => `<li>${x}</li>`).join('')}</ul>` : '');
 // 표 한 줄: 첫 칸은 이름, 나머지는 값
@@ -18,7 +19,7 @@ export function viewInsight() {
   const n = Object.keys(db.entries).length, mine = recentState();
   const demo = ui.demo && !mine, state = demo ? recentState(sampleEntries()) : mine, changes = demo ? [] : medChanges();
   app.innerHTML = `
-    <header class="top"><div><div class="over">${F('기록 {0}일', n)}</div><h1>${T('인사이트')}</h1></div></header>
+    <header class="top"><div><div class="over">${F('기록 {0}일', n)}</div><h1>${T('인사이트')}</h1></div>${settingsButton()}</header>
     <div class="sec">${demo ? T('예시 기록의 최근 7일') : T('최근 7일')}</div>
     ${state ? `<section class="card state"><b>${state.title}</b>
       ${state.flow ? `<div class="flow">${state.flow}</div>` : ''}
