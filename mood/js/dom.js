@@ -34,10 +34,8 @@ function replay(el, cls, ms) {
   el.classList.add(cls);
   setTimeout(() => el.classList.remove(cls), ms);
 }
-// 화면 내용이 바뀔 때의 움직임. 'enter'는 살짝 떠오르기(탭), 'next'/'prev'는 옆에서 들어오기(날짜 넘기기)
-export const enterApp = (how = 'enter') => replay(app, how, 380);
-// 시트 안의 내용이 옆에서 들어오기 (처음 안내의 장 넘기기)
-export const enterSheet = (how) => replay(sheet, how, 380);
+// 탭을 바꿀 때 화면이 살짝 떠오르는 움직임 (옆으로 넘기는 움직임은 swipe.js가 맡는다)
+export const enterApp = () => replay(app, 'enter', 320);
 
 // ---------- 시트 열고 닫기 ----------
 const SHEET_OUT = 240;   // app.css의 sheet-out 시간과 같아야 한다

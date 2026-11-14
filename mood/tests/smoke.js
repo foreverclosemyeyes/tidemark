@@ -70,7 +70,7 @@ function seed() {
     if (up) fire('touchend', 200 + d, false);
   }, [sel, dx, release]);
   await drag('#sheet .welcome', -150, false);
-  check('안내를 끄는 동안 화면이 손가락을 따라옴', await page.evaluate(() => document.querySelector('#sheet').classList.contains('dragging') && document.querySelector('#sheet').style.getPropertyValue('--drag') === '-67.5px'));
+  check('안내를 끄는 동안 화면이 손가락을 따라옴', await page.evaluate(() => document.querySelector('#sheet').classList.contains('dragging') && document.querySelector('#sheet').style.getPropertyValue('--drag') === '-150.0px'));
   await page.evaluate(() => { const el = document.querySelector('#sheet .welcome'); el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [new Touch({ identifier: 1, target: el, clientX: 50, clientY: 300 })], bubbles: true })); });
   await page.waitForTimeout(450);
   check('안내를 왼쪽으로 밀면 둘째 장으로 넘어감', (await page.$$('#sheet [data-act=care][data-v]')).length === 2);
@@ -225,11 +225,11 @@ function seed() {
   check('날짜를 누르면 그날 표시', await page.isVisible('.pickbar'));
 
   // 5-1. 옆으로 밀어서 날짜 넘기기
-  const swipe = (dx) => page.evaluate((d) => {
+  const swipe = async (dx) => { await page.evaluate((d) => {
     const el = document.querySelector('#app'), mk = (x) => new Touch({ identifier: 1, target: el, clientX: x, clientY: 300 });
     el.dispatchEvent(new TouchEvent('touchstart', { touches: [mk(200)], changedTouches: [mk(200)], bubbles: true }));
     el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [mk(200 + d)], bubbles: true }));
-  }, dx);
+  }, dx); await page.waitForTimeout(340); };   // 넘어가는 움직임이 끝난 뒤에 다음으로
   const monthBefore = await text('.pnav span');
   await swipe(120);
   check('흐름: 오른쪽으로 밀면 이전 달', (await text('.pnav span')) !== monthBefore);
@@ -512,12 +512,15 @@ function seed() {
   await drag('#app .tiles', 16); await page.waitForTimeout(300);
   check('조금만 밀고 떼면 날짜가 그대로이고 제자리로 돌아옴', (await text('h1')) === h1Before && !(await page.evaluate(() => document.querySelector('#app').classList.contains('dragging'))));
   await drag('#app .tiles', -200, false);
-  check('넘어갈 수 없는 쪽(내일)으로는 조금만 따라옴', await page.evaluate(() => document.querySelector('#app').style.getPropertyValue('--drag') === '-24.0px'));
+  check('넘어갈 수 없는 쪽(내일)으로는 조금만 따라옴', await page.evaluate(() => document.querySelector('#app').style.getPropertyValue('--drag') === '-30.0px'));
   await page.evaluate(() => { const el = document.querySelector('#app .tiles'); el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [new Touch({ identifier: 1, target: el, clientX: 0, clientY: 300 })], bubbles: true })); });
   await page.waitForTimeout(300);
   check('내일로는 안 넘어감', (await text('h1')) === h1Before);
-  await drag('#app .tiles', 200); await page.waitForTimeout(450);
-  check('충분히 끌고 떼면 전날로 넘어감', (await text('h1')) !== h1Before);
+  await drag('#app .tiles', 200);
+  check('넘어가는 동안 지금 화면의 사본이 옆으로 나가고 새 화면이 뒤따라 들어옴', await page.evaluate(() => !!document.querySelector('.swipe-ghost') && document.querySelector('#app').classList.contains('sliding')));
+  await page.waitForTimeout(450);
+  check('충분히 끌고 떼면 전날로 넘어감', (await text('#app > .top h1')) !== h1Before);
+  check('넘어간 뒤에는 사본이 남지 않음', !(await page.$('.swipe-ghost')) && (await page.$$('.tabbar')).length === 1);
   await page.click('[data-act=goToday]');
 
   // 방문 수 세기: 배포 주소에서만, 하루에 한 번, 기록 없이 신호만 보낸다. 설정에서 끄면 안 보낸다.

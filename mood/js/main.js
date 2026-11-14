@@ -1,14 +1,14 @@
 // 시작점: 누르기·입력 처리와 앱 시작
 import { aiSummary } from './analysis.js';
 import { addDays, today } from './dates.js';
-import { $, app, closeSheet, copyText, enterApp, enterSheet, sheet, sheetOpen, toTop, toast } from './dom.js';
+import { $, app, closeSheet, copyText, enterApp, sheet, sheetOpen, toTop, toast } from './dom.js';
 import { exportData, giveFile, hasAlarms, importData, makeIcs, remind, snoozeBackup } from './files.js';
 import { F, T } from './i18n.js';
 import { lockNow, removePin, setPin } from './lock.js';
 import { addDose, medKey, medsFor, normDose, setMeds, sugHtml, toggleDoseTime } from './meds.js';
 import { countVisit } from './count.js';
 import { render } from './render.js';
-import { onSwipe } from './swipe.js';
+import { onSwipe, slide } from './swipe.js';
 import { clinicView, standalone, trend, ui } from './state.js';
 import { CARE_ITEMS } from './constants.js';
 import { careOn, careUnasked, db, save } from './store.js';
@@ -112,7 +112,7 @@ const actions = {
     save(); render();
     toast(F('공황 {0}번째를 적었어요', e.panic));
   },
-  welcomeNext: () => welcomeTo(1),
+  welcomeNext: () => slide(sheet, 1, () => openWelcome(1)),
   // 방문 수 세기에서 이 폰을 빼거나 다시 넣는다: 설정 맨 아래의 버전 글자를 3초 안에 다섯 번 누른다.
   // 스위치를 화면에 두면 쓰는 사람 모두에게 보여서, 앱 주인만 아는 방법으로 숨겨 두었다 (사용자가 정함, 2026-11-14).
   aboutTap: () => {
@@ -324,19 +324,13 @@ onSwipe(app, {
   go: (step) => {
     if (ui.tab === 'today') ui.selected = addDays(ui.selected, step); else shiftTrend(step);
     render();
-    enterApp(step > 0 ? 'next' : 'prev');
   },
 });
 // 처음 안내도 옆으로 밀어 넘긴다 (다른 시트에서는 밀리지 않는다)
 const WELCOME_LAST = 1;
-function welcomeTo(step) {
-  const from = ui.welcome;
-  openWelcome(step);
-  enterSheet(step > from ? 'next' : 'prev');
-}
 onSwipe(sheet, {
   can: (step) => ui.welcome != null && ui.welcome + step >= 0 && ui.welcome + step <= WELCOME_LAST,
-  go: (step) => welcomeTo(ui.welcome + step),
+  go: (step) => openWelcome(ui.welcome + step),
 });
 
 // 흐름 그래프에서 날짜 칸을 누르면 그날 값을 보여 준다
