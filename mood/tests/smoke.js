@@ -368,8 +368,8 @@ function seed() {
   await page.waitForFunction((k) => localStorage.getItem(k) && Object.keys(JSON.parse(localStorage.getItem(k)).entries).length > 20, KEY);
   check('백업 불러오기', Object.keys((await store()).entries).length === 29);
   const back = await store();
-  check('새 앱에 불러오면 약·내 항목·진료 기록·화면 설정·진단명도 돌아옴', back.meds.length === 1 && back.settings.custom[0].name === '걸음 수' && back.clinic.log[0].text === '10mg → 15mg' && back.clinic.notes[0] === '잠 이야기'
-    && back.settings.color === 'blue' && back.settings.use.join() === 'depression,adhd' && back.settings.fxCustom[0] === '발진', JSON.stringify(back.settings));
+  check('새 앱에 불러오면 약·내 항목·진료 기록·화면 설정도 돌아옴', back.meds.length === 1 && back.settings.custom[0].name === '걸음 수' && back.clinic.log[0].text === '10mg → 15mg' && back.clinic.notes[0] === '잠 이야기'
+    && back.settings.color === 'blue' && back.settings.fxCustom[0] === '발진', JSON.stringify(back.settings));
 
   // 8. 예전(3단계) 기록 옮기기
   await put({ version: 1, entries: { [today]: { date: today, mood: 5, energy: 5, dep: 0, elev: 0, anx: 0, appetite: 2, caffeine: 1, meds: [], signs: {}, tags: { alcohol: true } } }, meds: [], settings: {} });
@@ -394,22 +394,15 @@ function seed() {
   await page.click('[data-act=pinOff]');
   check('잠금 끄기', !(await store()).settings.pin);
 
-  // 9. 진단명: 여러 개 고를 수 있고, 고르기만 할 뿐 기록 항목·내 항목·기록은 건드리지 않는다
-  const before9 = JSON.stringify([(await store()).entries, (await store()).settings.off || [], (await store()).settings.custom || []]);
-  await page.click('[data-act=dx][data-p=depression]'); await page.click('[data-act=dx][data-p=adhd]');
-  let st = (await store()).settings;
-  check('진단명을 여러 개 고름 (처음부터 켜져 있는 조울증 + 우울증 + ADHD)', st.use.join() === 'bipolar,depression,adhd' && (await page.$$('[data-act=dx][aria-pressed=true]')).length === 3);
-  check('진단명을 골라도 기록 항목·내 항목·기록은 그대로', JSON.stringify([(await store()).entries, st.off || [], st.custom || []]) === before9);
-  await page.click('[data-act=dx][data-p=bipolar]');
-  check('진단명을 다시 누르면 꺼짐', (await store()).settings.use.join() === 'depression,adhd');
-  // 진단명은 참고일 뿐: 우울증·ADHD만 골랐어도 기록에 들뜬 시기가 보이면 그대로 말하고, 진단명에 없는 모습이라고 짚어 준다
+  // 9. 숫자로 보기: 최근 7일과 그 전 4주가 표로 나오고, 진단명 설정은 없다
   await page.click('[data-act=close]');
   await put(seed());
-  await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('tide.v1')); d.settings.use = ['depression', 'adhd']; localStorage.setItem('tide.v1', JSON.stringify(d)); });
-  await page.reload(); await page.waitForSelector('h1');
   await page.click('[data-tab=insight]');
-  const stateText = await page.textContent('.state');
-  check('우울증만 골랐어도 들뜬 모습을 걸러 내지 않고, 진단명에 없는 모습이라고 짚어 줌', /hypomania|경조증/.test(stateText) && /not among the chosen diagnoses|고른 진단명에 조울증은 없지만/.test(stateText));
+  const numRows = await page.$$eval('.nums >> nth=0 >> .tr', (els) => els.map((x) => x.textContent));
+  check('인사이트에 숫자 표가 나옴 (최근 7일 · 그 전 4주, 기분·잠 줄)', numRows.length >= 5 && /최근 7일/.test(numRows[0]) && numRows.some((x) => x.startsWith('기분')) && numRows.some((x) => x.startsWith('잠의 들쭉날쭉')), numRows.join(' | '));
+  await openSet();
+  check('설정에 진단명이 없음', !(await page.$('#sheet [data-act=dx]')) && !/진단명/.test(await page.textContent('#sheet')));
+  await page.click('[data-act=close]'); await page.waitForTimeout(300);
   // 설정은 가로 탭으로 나뉘어 있고, 고른 탭의 내용만 보인다. 흐름·인사이트·진료 화면에서도 설정을 열 수 있다.
   await page.evaluate(() => { const st = document.querySelector('#test-allpanes'); if (st) st.remove(); });
   for (const tab of ['trend', 'insight', 'clinic']) {
@@ -419,9 +412,9 @@ function seed() {
     await page.click('#sheet [data-act=close]'); await page.waitForTimeout(300);
   }
   await page.click('[data-tab=today]'); await page.click('#app .top [data-act=settings]');
-  check('설정을 열면 기록 탭만 보임', await page.isVisible('#sheet [data-act=dx]') && await page.isHidden('#sheet [data-act=export]'));
+  check('설정을 열면 기록 탭만 보임', await page.isVisible('#sheet [data-act=customAdd]') && await page.isHidden('#sheet [data-act=export]'));
   await page.click('#sheet [data-act=setTab][data-g=data]');
-  check('탭을 누르면 그 탭의 내용으로 바뀜', await page.isHidden('#sheet [data-act=dx]') && await page.isVisible('#sheet [data-act=export]'));
+  check('탭을 누르면 그 탭의 내용으로 바뀜', await page.isHidden('#sheet [data-act=customAdd]') && await page.isVisible('#sheet [data-act=export]'));
   await page.click('#sheet [data-act=setTab][data-g=rec]');
   // 약은 종류를 먼저 고르고, 영어 성분 이름으로도 찾을 수 있다
   await page.click('[data-act=addMed]');
@@ -480,10 +473,10 @@ function seed() {
   check('"그냥 컨디션"을 고르면 증상·약 항목과 인사이트·진료 탭이 숨겨짐', mode.care === false && ['dep', 'si', 'meds'].every((k) => mode.off.includes(k))
     && (await page.$$('.tabbar button')).length === 2 && !(await page.$('[data-act=panicAdd]')) && !(await page.$('[data-act=medSetup]')) && !(await page.$('.intro')));
   await openSet();
-  check('설정에서 병원 · 상담용 기능이 꺼져 있고 진단명은 안 보임', (await page.getAttribute('#sheet [data-act=care]', 'aria-pressed')) === 'false' && !(await page.$('[data-act=dx]')));
+  check('설정에서 병원 · 상담용 기능이 꺼져 있음', (await page.getAttribute('#sheet [data-act=care]', 'aria-pressed')) === 'false');
   await page.click('#sheet [data-act=care]');
   mode = (await store()).settings;
-  check('설정에서 다시 켜면 항목과 탭이 돌아옴', mode.care === true && !mode.off.includes('dep') && (await page.$$('.tabbar button')).length === 4 && !!(await page.$('[data-act=dx]')));
+  check('설정에서 다시 켜면 항목과 탭이 돌아옴', mode.care === true && !mode.off.includes('dep') && (await page.$$('.tabbar button')).length === 4);
   await page.click('[data-act=close]');
   check('병원 · 상담용으로 쓰면 기록이 없을 때 소개가 보임', !!(await page.$('.intro [data-act=demoClinic]')));
   await page.click('[data-act=demoClinic]');

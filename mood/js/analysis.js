@@ -3,7 +3,7 @@ import { SIGNS, cafMg, customText, drinkText, fxName, fxNames, psyName, psyNames
 import { addDays, durText, md, parse, today } from './dates.js';
 import { F, T } from './i18n.js';
 import { aided, medsFor, medsText } from './meds.js';
-import { customDefs, db, usesOn } from './store.js';
+import { customDefs, db, itemOn } from './store.js';
 
 // ---------- 초기 신호 · 인사이트 (전부 이 폰 안에서 계산) ----------
 export const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
@@ -105,7 +105,7 @@ function before(entries, start, mine) {
 //   points: [근거 문장, …] (많아도 6줄), notes: [덧붙이는 말, …] (많아도 2개) }
 // 최근 7일 중 4일 이상 적었을 때만 나온다 (모자라면 null).
 export function recentState(entries = db.entries) {
-  const t = today(), mine = entries === db.entries, dx = usesOn();
+  const t = today(), mine = entries === db.entries;
   const span = (from, to) => Object.keys(entries).sort().filter((k) => k > addDays(t, -from) && k <= addDays(t, -to)).map((k) => entries[k]);
   const now = span(7, 0), prior = span(35, 7);
   if (now.length < 4) return null;
@@ -191,24 +191,84 @@ export function recentState(entries = db.entries) {
 
   // 덧붙이는 말 (많아도 두 개): 비슷해 보이는 것들을 가르는 데 연구에서 쓰는 단서가 기록에 있으면 알려 준다. 어느 쪽이라고 정하지는 않는다.
   const notes = [];
-  // 고른 진단명은 참고일 뿐이다 (진단이 틀렸을 수도 있다). 기록에 보이는 모습을 진단명으로 걸러 내지 않고, 진단명에 없는 모습이면 짚어 준다.
-  if ((kind === 'high' || kind === 'mixed') && dx.length && !dx.includes('bipolar')) notes.push(T('고른 진단명에 조울증은 없지만 들뜬 시기에 가까운 모습이에요. 진료 때 이 기록을 보여 주세요.'));
-  else if (kind === 'low' && dx.length && !dx.includes('depression') && !dx.includes('bipolar')) notes.push(T('고른 진단명에 우울증이나 조울증은 없지만 가라앉은 시기에 가까운 모습이에요. 진료 때 이 기록을 보여 주세요.'));
   // ADHD와 들뜬 시기: ADHD는 늘 이어지고, 들뜬 시기는 어느 날부터 시작된다. 잠이 줄어도 피곤하지 않은 것과 부풀어 오른 자신감은 ADHD의 모습이 아니다 [근거 7, 13]
-  if (up && (dx.includes('adhd') || !dx.includes('bipolar'))) {
+  // (진단명을 묻지 않으므로, 가르는 단서가 두 가지 이상 기록에 있을 때만 말한다)
+  if (up) {
     const clues = [started && prior.filter(upDay).length <= prior.length / 4 ? T('어느 날부터 시작됨') : '', lessNeed ? T('잠이 줄었는데 피곤하지 않음') : '', grand ? T('자신감이 크게 높아짐') : ''].filter(Boolean);
-    notes.push(clues.length >= 2 ? F('{0}은 ADHD보다 들뜬 시기에서 흔한 모습이에요.', clues.join(' · ')) : T('잠과 자신감이 평소와 같다면 ADHD에서도 흔한 모습이에요.'));
+    if (clues.length >= 2) notes.push(F('{0}은 ADHD보다 들뜬 시기에서 흔한 모습이에요.', clues.join(' · ')));
   }
   // 가라앉은 시기에 잠·식욕이 늘거나 정신병적 증상이 있는 것은 조울증의 우울에서 조금 더 흔하다. 그것만으로 가를 수는 없다 [근거 6, 12]
-  if (down && !dx.includes('bipolar')) {
+  if (down) {
     const clues = [moreSleep ? T('잠이 늘어남') : '', moreAppetite ? T('식욕이 늘어남') : '', psyDays ? T('정신병적 증상') : ''].filter(Boolean);
     if (clues.length) notes.push(F('가라앉은 시기의 {0}은 조울증의 우울에서 조금 더 흔해요. 진료 때 이야기해 보세요.', clues.join(' · ')));
   }
   // 조현병: 재발 몇 주 전에 불안과 잠 문제가 먼저 나타나기도 한다 [근거 8]
-  if ((dx.includes('psychosis') || Object.keys(entries).some((k) => entries[k].psy >= 1)) && !psyDays && anxDays >= 3 && sleepDiff != null && sleepDiff <= -60) {
+  if (Object.keys(entries).some((k) => entries[k].psy >= 1) && !psyDays && anxDays >= 3 && sleepDiff != null && sleepDiff <= -60) {
     notes.push(T('불안과 잠 문제가 함께 늘었어요. 정신병적 증상에 앞서 오기도 해요.'));
   }
   return { kind, title, flow, lead, points, notes: notes.slice(0, 2) };
+}
+
+// ---------- 숫자로 보기 ----------
+// 해석 없이 숫자만: 최근 7일과 그 전 4주를 나란히 놓은 표 (사용자가 정량적이고 객관적인 정보를 원했다, 2026-11-14).
+// 최근 7일 중 3일 이상 적었을 때만 나온다. 설정에서 꺼 둔 항목의 줄은 뺀다. [[이름, 최근 7일, 그 전 4주], …]
+export function numbers(entries = db.entries) {
+  const t = today(), mine = entries === db.entries;
+  const span = (from, to) => Object.keys(entries).sort().filter((k) => k > addDays(t, -from) && k <= addDays(t, -to)).map((k) => entries[k]);
+  const now = span(7, 0), base = span(35, 7);
+  if (now.length < 3) return [];
+  const vals = (list, key) => list.map((e) => e[key]).filter((x) => x != null);
+  const one = (x) => x.toFixed(1), dur = (m) => durText(Math.round(m));
+  // 평균 (가장 낮은 값–높은 값)
+  const mean = (list, key, fmt) => {
+    const v = vals(list, key), end = (x) => (fmt === one ? String(x) : fmt(x));   // 0~10 점수의 범위는 "4–6"처럼 소수점 없이
+    return v.length ? `${fmt(avg(v))}<small>${end(Math.min(...v))}–${end(Math.max(...v))}</small>` : '–';
+  };
+  // 밤마다 잠이 얼마나 들쭉날쭉한지 (표준편차)
+  const spread = (list) => { const v = vals(list, 'sleepMin'); if (v.length < 3) return '–'; const m = avg(v); return `±${dur(Math.sqrt(avg(v.map((x) => (x - m) ** 2))))}`; };
+  // 잠든 시각의 평균 (자정을 넘긴 시각은 다음 날로 이어서 센다)
+  const bed = (list) => {
+    const v = list.filter((e) => e.bed).map((e) => { const [h, m] = e.bed.split(':').map(Number); return h * 60 + m + (h < 12 ? 1440 : 0); });
+    if (v.length < 3) return '–';
+    const a = Math.round(avg(v)) % 1440;
+    return `${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`;
+  };
+  // 그런 날이 며칠인지: "2/7일" (그 값을 적은 날 가운데)
+  const days = (list, key, test) => { const v = list.filter((e) => e[key] != null); return v.length ? F('{0}/{1}일', v.filter(test).length, v.length) : '–'; };
+  const took = (list) => (list.length ? F('{0}/{1}일', list.filter((e) => medsFor(e.date).length).length, list.length) : '–');
+  const row = (on, name, f) => (on ? [[name, f(now), f(base)]] : []);
+  return [
+    ...row(itemOn('mood'), T('기분'), (l) => mean(l, 'mood', one)),
+    ...row(itemOn('energy'), T('에너지'), (l) => mean(l, 'energy', one)),
+    ...row(itemOn('conf'), T('자신감'), (l) => mean(l, 'conf', one)),
+    ...row(itemOn('sleep'), T('잠'), (l) => mean(l, 'sleepMin', dur)),
+    ...row(itemOn('sleep'), T('잠의 들쭉날쭉'), spread),
+    ...row(itemOn('sleep'), T('잠든 시각'), bed),
+    ...row(itemOn('sleep'), T('5시간 미만 밤'), (l) => days(l, 'sleepMin', (e) => e.sleepMin < SHORT_SLEEP)),
+    ...row(itemOn('dep'), T('우울이 보통 이상'), (l) => days(l, 'dep', (e) => e.dep >= 2)),
+    ...row(itemOn('anx'), T('불안이 보통 이상'), (l) => days(l, 'anx', (e) => e.anx >= 2)),
+    ...row(itemOn('panic') && [...now, ...base].some((e) => e.panic), T('공황'), (l) => F('{0}번', l.reduce((n, e) => n + (e.panic || 0), 0))),
+    ...row(itemOn('meds') && mine && db.meds.length > 0, T('약 먹은 날'), took),
+    [T('적은 날'), F('{0}/{1}일', now.length, 7), F('{0}/{1}일', base.length, 28)],
+  ].filter(([, a, b]) => a !== '–' || b !== '–');
+}
+
+// 잠을 적게 잔 날과 그 밖의 날: 최근 8주에서, 내 평균보다 1시간 넘게 적게 자고 일어난 날의 기분·에너지·불안을 나머지 날과 나란히 놓는다.
+// 잠이 줄면 그날·다음 날의 기분과 죽고 싶은 생각이 나빠진다는 연구가 있다 [근거 11]. "1시간"과 "각각 4일·8일 이상"은 내가 정했다.
+// 돌려주는 것: { short: 적게 잔 날 수, rest: 그 밖의 날 수, rows: [[이름, 적게 잔 날, 그 밖의 날], …] } 또는 null
+export function shortSleepDays(entries = db.entries) {
+  const t = today(), list = Object.keys(entries).filter((k) => k > addDays(t, -56) && k <= t).map((k) => entries[k]).filter((e) => e.sleepMin != null);
+  if (list.length < 12) return null;
+  const mean = avg(list.map((e) => e.sleepMin)), short = list.filter((e) => e.sleepMin < mean - 60), rest = list.filter((e) => e.sleepMin >= mean - 60);
+  if (short.length < 4 || rest.length < 8) return null;
+  const num = (l, key) => { const v = l.map((e) => e[key]).filter((x) => x != null); return v.length ? avg(v).toFixed(1) : '–'; };
+  const days = (l, key, test) => { const v = l.filter((e) => e[key] != null); return v.length ? F('{0}/{1}일', v.filter(test).length, v.length) : '–'; };
+  const row = (on, name, f) => (on ? [[name, f(short), f(rest)]] : []);
+  const rows = [
+    ...row(itemOn('mood'), T('기분'), (l) => num(l, 'mood')), ...row(itemOn('energy'), T('에너지'), (l) => num(l, 'energy')),
+    ...row(itemOn('dep'), T('우울이 보통 이상'), (l) => days(l, 'dep', (e) => e.dep >= 2)), ...row(itemOn('anx'), T('불안이 보통 이상'), (l) => days(l, 'anx', (e) => e.anx >= 2)),
+  ].filter(([, a, b]) => a !== '–' && b !== '–');
+  return rows.length ? { short: short.length, rest: rest.length, rows } : null;
 }
 
 // ---------- 약을 바꾼 앞뒤 ----------

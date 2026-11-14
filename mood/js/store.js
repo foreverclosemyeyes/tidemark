@@ -45,9 +45,6 @@ export const db = load();
 // 내 항목: 사용자가 설정에서 직접 만든 기록 항목들 [{ id, name, type, unit }]
 export const customDefs = () => db.settings.custom || [];
 
-// 고른 진단명들 (여러 개 가능. 한 번도 안 골랐으면 조울증. 예전에는 하나만 글자로 저장했다)
-export const usesOn = () => { const u = db.settings.use; return Array.isArray(u) ? u : [u || 'bipolar']; };
-
 // 병원·상담용 기능(증상·약 항목, 인사이트·진료 화면)을 쓰는지. 처음 열 때 묻고 설정에서 바꾼다.
 // 한 번도 안 골랐으면 켜진 것으로 본다 (이 물음이 생기기 전부터 쓰던 사람은 그대로).
 export const careOn = () => db.settings.care !== false;

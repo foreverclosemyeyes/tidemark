@@ -1,6 +1,6 @@
 // 설정 화면
 import { VERSION } from '../config.js';
-import { CUSTOM_TYPES, DIAGNOSES, DISCLAIMER, FONTS, ITEMS, SIZES } from '../constants.js';
+import { CUSTOM_TYPES, DISCLAIMER, FONTS, ITEMS, SIZES } from '../constants.js';
 import { esc, sheet, showSheet } from '../dom.js';
 import { daysSinceBackup, remind } from '../files.js';
 import { EN, F, T } from '../i18n.js';
@@ -8,7 +8,7 @@ import { IC } from '../icons.js';
 import { hasPin } from '../lock.js';
 import { medAddHtml, medKey } from '../meds.js';
 import { standalone, ui } from '../state.js';
-import { careOn, customDefs, db, itemOn, usesOn } from '../store.js';
+import { careOn, customDefs, db, itemOn } from '../store.js';
 import { ACCENTS, accentKey, isLight } from '../theme.js';
 
 // ---------- 설정·백업 ----------
@@ -45,10 +45,6 @@ export function openSettings() {
     ${group('rec', `
     <section class="card list"><button type="button" class="li sw" data-act="care" aria-pressed="${careOn()}"><span class="lk">${T('병원 · 상담용 기능')}</span><i></i></button></section>
     <p class="secnote">${T('끄면 증상 · 약 · 부작용 항목과 인사이트 · 진료 화면이 숨겨져요. 적어 둔 기록은 지워지지 않고, 다시 켜면 그대로 나와요. 항목은 아래에서 하나씩 따로 켤 수도 있어요.')}</p>
-
-    ${careOn() ? `<div class="sec">${T('진단명')}</div>
-    <section class="card list">${DIAGNOSES.map(([k, label]) => pick('dx', `data-p="${k}"`, usesOn().includes(k), label)).join('')}</section>
-    <p class="secnote">${T('해당하는 것을 여러 개 골라도 돼요. 인사이트에서 무엇을 먼저 보여 줄지에만 참고해요. 진단명에 없는 모습이 기록에 보이면 그것도 그대로 알려 줘요. 기록 항목이나 적어 둔 기록은 바뀌지 않아요.')}</p>` : ''}
 
     <div class="sec">${T('기록 항목')}</div>
     <section class="card list">${ITEMS.map(([k, label]) => `<button type="button" class="li sw" data-act="item" data-k="${k}" aria-pressed="${itemOn(k)}"><span class="lk">${label}</span><i></i></button>`).join('')}</section>

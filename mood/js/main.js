@@ -10,7 +10,7 @@ import { render } from './render.js';
 import { onSwipe } from './swipe.js';
 import { clinicView, standalone, trend, ui } from './state.js';
 import { CARE_ITEMS } from './constants.js';
-import { careOn, careUnasked, db, save, usesOn } from './store.js';
+import { careOn, careUnasked, db, save } from './store.js';
 import { applyFont, applyTheme, themeQuery } from './theme.js';
 import { clinicData, clinicWeeks, openLog, summaryText } from './views/clinic.js';
 import { notesListHtml, openNotes } from './views/notes.js';
@@ -68,12 +68,6 @@ const actions = {
     if (!mine.includes(name)) { mine.push(name); save(); }
     ui.draft.fx[`c:${name}`] = true;
     $('#fx').innerHTML = fxHtml();
-  },
-  // 설정: 진단명 고르기 (여러 개 가능). 인사이트에만 참고로 쓰이고 다른 것은 건드리지 않는다.
-  dx: (el) => {
-    const key = el.dataset.p, was = usesOn();
-    db.settings.use = was.includes(key) ? was.filter((k) => k !== key) : [...was, key];
-    save(); render(); redrawSettings();
   },
   // 내 항목: 0~10 값을 다시 비우기 (기록 화면), 새 항목 종류 고르기 · 더하기 · 지우기 (설정)
   customClear: (el) => {

@@ -83,7 +83,7 @@ export function importData(file) {
     // 기록이 하나도 없는 새 앱(지웠다가 다시 깔았거나 새 폰)에 불러올 때는 화면 설정과 직접 만든 목록도 백업에서 가져온다.
     // 이미 쓰던 앱에 합칠 때는 지금 설정을 그대로 둔다. 잠금 비밀번호는 백업에 없다.
     if (!Object.keys(db.entries).length && inc.settings && typeof inc.settings === 'object') {
-      ['theme', 'color', 'font', 'size', 'remind', 'use', 'off', 'care', 'fxCustom', 'psyCustom'].forEach((k) => { if (inc.settings[k] != null) db.settings[k] = inc.settings[k]; });
+      ['theme', 'color', 'font', 'size', 'remind', 'off', 'care', 'fxCustom', 'psyCustom'].forEach((k) => { if (inc.settings[k] != null) db.settings[k] = inc.settings[k]; });
       applyTheme(); applyFont();
     }
     Object.values(inc.entries).forEach((e) => {
