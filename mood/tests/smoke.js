@@ -53,12 +53,21 @@ function seed() {
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   page.on('dialog', (d) => d.accept());
   const store = () => page.evaluate((k) => JSON.parse(localStorage.getItem(k)), KEY);
-  const put = async (data) => { await page.evaluate(([k, d]) => localStorage.setItem(k, JSON.stringify(d)), [KEY, data]); await page.reload(); };
+  // 따로 적지 않으면 처음 안내는 이미 지난 것으로 둔다 (care: true)
+  const put = async (data) => { if (data.settings && !('care' in data.settings)) data.settings.care = true; await page.evaluate(([k, d]) => localStorage.setItem(k, JSON.stringify(d)), [KEY, data]); await page.reload(); };
   const text = (sel) => page.textContent(sel);
   const today = dayAgo(0);
 
   // 1. 처음 열기
   await page.goto(url);
+  check('처음 열면 안내가 한 장 뜸', !!(await page.$('#sheet .welcome [data-act=welcomeNext]')));
+  await page.click('[data-act=welcomeNext]');
+  check('안내 둘째 장에서 어떻게 쓸지 물어봄', (await page.$$('#sheet [data-act=care][data-v]')).length === 2);
+  await page.click('#sheet [data-act=care][data-v="1"]');
+  await page.waitForTimeout(350);
+  check('고르면 안내가 닫히고 다시 안 뜸', (await store()).settings.care === true && await page.isHidden('#sheet'));
+  await page.reload(); await page.waitForSelector('h1');
+  check('다시 열어도 안내가 안 뜸', await page.isHidden('#sheet'));
   check('처음 열면 오늘 화면', (await text('h1')) === '오늘');
   check('빈 날에 기록하기 버튼', await page.isVisible('[data-act=record]'));
   check('빈 날에는 안 적은 항목이 작은 딱지로 모여 있음', (await page.$$('#app .chip.sm[data-focus]')).length >= 7 && (await page.$$('#app button.li[data-focus]')).length === 0 && (await text('#app [data-focus=appetite]')).includes('식욕'));
@@ -287,7 +296,7 @@ function seed() {
   check('다시 켜면 칸이 돌아옴', (await page.$$('.tile[data-focus=conf]')).length === 1 && (await store()).settings.off.length === 0);
 
   // 5-3. 메모 모아 보기
-  await page.click('[data-tab=insight]'); await page.click('[data-act=notes]');
+  await page.click('[data-tab=trend]'); await page.click('[data-act=notes]');
   check('메모가 날짜별로 모임', (await page.$$('#notes-list .note')).length === 2);
   await page.fill('#q-notes', '산책');
   check('낱말로 찾기', (await page.$$('#notes-list .note')).length === 1);
@@ -435,9 +444,13 @@ function seed() {
 
   // 처음 쓰는 사람: 오늘 화면에 이 앱이 무엇인지 한 줄이 있고, 예시 요약을 볼 수 있다. 예시는 저장되지 않는다.
   const kept = await store();
-  await put({ version: 3, entries: {}, meds: [], taken: {}, clinic: { notes: [] }, settings: {} });
-  check('처음 열면 어떻게 쓸지 물어봄', (await page.$$('[data-act=care][data-v]')).length === 2 && !(await page.$('[data-act=demoClinic]')));
-  await page.click('[data-act=care][data-v="0"]');
+  // 이미 쓰던 사람(기록은 있고 고른 적은 없음)에게도 안내가 한 번 뜬다
+  await put({ ...kept, settings: { ...kept.settings, care: null } });
+  check('쓰던 사람에게도 안내가 한 번 뜸', !!(await page.$('#sheet .welcome')));
+  await put({ version: 3, entries: {}, meds: [], taken: {}, clinic: { notes: [] }, settings: { care: null } });
+  await page.click('[data-act=welcomeNext]');
+  await page.click('#sheet [data-act=care][data-v="0"]');
+  await page.waitForTimeout(350);
   let mode = (await store()).settings;
   check('"그냥 컨디션"을 고르면 증상·약 항목과 인사이트·진료 탭이 숨겨짐', mode.care === false && ['dep', 'si', 'meds'].every((k) => mode.off.includes(k))
     && (await page.$$('.tabbar button')).length === 2 && !(await page.$('[data-act=panicAdd]')) && !(await page.$('[data-act=medSetup]')) && !(await page.$('.intro')));

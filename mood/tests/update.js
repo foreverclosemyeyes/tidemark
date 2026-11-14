@@ -34,6 +34,8 @@ const bump = (file, pattern) => fs.writeFileSync(file, fs.readFileSync(file, 'ut
     return text.split(' · ')[0];
   };
   await page.goto(`http://localhost:${server.address().port}/`);
+  // 처음 안내를 넘긴다
+  await page.click('[data-act=welcomeNext]'); await page.click('#sheet [data-act=care][data-v="1"]'); await page.waitForTimeout(350);
   await page.waitForFunction(() => navigator.serviceWorker.controller);
   const before = await version();
 

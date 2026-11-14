@@ -189,5 +189,6 @@ export function viewTrend() {
     ${itemOn('sleep') ? sleepCard() : ''}
     ${SYMPTOMS.filter(([k]) => k !== 'si' && itemOn(k)).map(([k, name]) => symCard(k, name)).join('')}
     ${marks()}
+    ${itemOn('note') ? `<section class="card list"><button class="li add" data-act="notes">${IC.note}&nbsp; ${T('메모 모아 보기')}</button></section>` : ''}
     <p class="foot">${T('그래프나 달력에서 날짜를 누르면 그날 값을 볼 수 있어요.')}<br>${DISCLAIMER}</p>`;
 }

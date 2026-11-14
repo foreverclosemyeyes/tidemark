@@ -95,6 +95,19 @@ button { border: 0; background: none; padding: 0; cursor: pointer; touch-action:
 
 /* 묶음 목록 */
 .sec { color: var(--muted); font-size: calc(12.5px * var(--fs, 1.12)); font-weight: 500; margin: 20px 16px 7px; }
+/* 처음 한 번 뜨는 안내 */
+.sheet-in.welcome { padding-top: calc(var(--safe-t) + 64px); }
+.wl-row > span { flex: 1 1 auto; min-width: 0; }
+.welcome h2 { text-align: center; margin: 0; font-size: calc(24px * var(--fs, 1.12)); font-weight: 700; letter-spacing: -0.02em; }
+.welcome .wl-sub { text-align: center; color: var(--muted); font-size: calc(14px * var(--fs, 1.12)); line-height: 1.5; margin: 8px 16px 26px; }
+.wl-icon { display: block; width: 76px; height: 76px; border-radius: 18px; margin: 0 auto 16px; }
+.wl-row { justify-content: flex-start; gap: 14px; padding-top: 13px; padding-bottom: 13px; }
+.wl-row .ic { flex: none; color: var(--muted); }
+.wl-row b { display: block; font-weight: 600; }
+.wl-row small { display: block; color: var(--muted); font-size: calc(13px * var(--fs, 1.12)); line-height: 1.45; margin-top: 2px; }
+.wl-dots { display: flex; justify-content: center; gap: 7px; margin: 22px 0 18px; }
+.wl-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+.wl-dots i.on { background: var(--ink); }
 /* 오늘 화면: 기록이 없을 때의 소개 */
 .intro b { display: block; font-size: calc(16px * var(--fs, 1.12)); font-weight: 600; line-height: 1.4; }
 .intro p { margin: 6px 0 12px; color: var(--muted); font-size: calc(13.5px * var(--fs, 1.12)); line-height: 1.5; }

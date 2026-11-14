@@ -1,4 +1,4 @@
-// 인사이트 화면: 최근 7일을 종합해서 읽은 것(짧게), 약을 바꾼 앞뒤, 메모·AI로 가는 줄.
+// 인사이트 화면: 최근 7일을 종합해서 읽은 것(짧게), 약을 바꾼 앞뒤, AI로 가는 줄.
 // 길게 늘어놓지 않는다: 평균끼리 견준 비교 목록은 뻔하거나 쓸모없다고 해서 뺐다 (사용자가 정함, 2026-11-13).
 // 기록이 아직 적으면 예시 기록으로 어떤 것이 나오는지 미리 볼 수 있다 (ui.demo).
 import { medChanges, recentState } from '../analysis.js';
@@ -32,7 +32,6 @@ export function viewInsight() {
     <section class="card tbl">${c.text ? `<div class="tbl-t">${esc(c.text)}</div>` : ''}${tr(['', T('앞 2주'), F('뒤 {0}일', c.after)], true)}${c.rows.map((r) => tr(r)).join('')}</section>`).join('')}
     <div class="sec">${T('더 보기')}</div>
     <section class="card list">
-      <button class="li add" data-act="notes">${IC.note}&nbsp; ${T('메모 모아 보기')}</button>
       <button class="li add" data-act="copyAi">${IC.spark}&nbsp; ${T('AI에게 물어볼 글 복사 (최근 4주)')}</button>
     </section>
     <p class="secnote">${T('복사한 글을 Claude나 ChatGPT 같은 AI 앱에 붙여 넣으면 기록 전체를 읽고 패턴을 정리해 줘요. 붙여 넣는 순간 그 기록은 해당 AI 서비스로 전송돼요.')}</p>`;

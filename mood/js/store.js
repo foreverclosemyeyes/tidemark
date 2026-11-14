@@ -51,8 +51,8 @@ export const usesOn = () => { const u = db.settings.use; return Array.isArray(u)
 // 병원·상담용 기능(증상·약 항목, 인사이트·진료 화면)을 쓰는지. 처음 열 때 묻고 설정에서 바꾼다.
 // 한 번도 안 골랐으면 켜진 것으로 본다 (이 물음이 생기기 전부터 쓰던 사람은 그대로).
 export const careOn = () => db.settings.care !== false;
-// 아직 안 물어봤는지: 고른 적이 없고 기록도 없을 때만 묻는다
-export const careUnasked = () => db.settings.care == null && !Object.keys(db.entries).length;
+// 아직 안 물어봤는지 (처음 안내가 뜬다. 이미 쓰던 사람에게도 한 번 묻는다)
+export const careUnasked = () => db.settings.care == null;
 
 // 설정에서 꺼 둔 기록 항목인지 (settings.off에 열쇠가 있으면 꺼진 것. 없으면 전부 켜짐)
 export const itemOn = (key) => !(db.settings.off || []).includes(key);

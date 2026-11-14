@@ -7,7 +7,7 @@ import { F, T } from '../i18n.js';
 import { IC } from '../icons.js';
 import { doseRowsHtml, medsFor, medsText } from '../meds.js';
 import { standalone, ui } from '../state.js';
-import { careOn, careUnasked, customDefs, db, itemOn } from '../store.js';
+import { careOn, customDefs, db, itemOn } from '../store.js';
 import { moodFill, tone } from '../theme.js';
 
 // ---------- 오늘 화면 ----------
@@ -31,12 +31,7 @@ export function viewToday() {
        <button class="x" data-act="closeHint" aria-label="${T('닫기')}">✕</button></div>` : '';
 
   // 기록이 하나도 없을 때만: 이 앱이 무엇에 쓰는 것인지 한 줄과, 예시 요약으로 가는 단추
-  // 맨 처음 한 번: 어떻게 쓸지 묻고, 고른 쪽에 맞춰 항목과 탭을 정리한다
-  const ask = !careUnasked() ? '' : `<section class="card intro"><b>${T('어떻게 쓰실 건가요?')}</b>
-      <p style="margin-bottom:0">${T('고른 쪽에 맞춰 화면을 정리해 드려요. 설정에서 언제든 바꿀 수 있어요.')}</p></section>
-    <button type="button" class="card grp" data-act="care" data-v="1"><span><b>${T('병원이나 상담에 다니고 있어요')}</b><small>${T('증상 · 약 · 진료용 요약까지')}</small></span><i class="chev"></i></button>
-    <button type="button" class="card grp" data-act="care" data-v="0"><span><b>${T('그냥 내 컨디션을 적어 보고 싶어요')}</b><small>${T('기분 · 에너지 · 잠만 간단하게')}</small></span><i class="chev"></i></button>`;
-  const intro = ask || !careOn() || Object.keys(db.entries).length ? '' : `<section class="card intro"><b>${T('매일 10초 적어 두면, 진료 날 한 장으로 보여 드려요.')}</b>
+  const intro = !careOn() || Object.keys(db.entries).length ? '' : `<section class="card intro"><b>${T('매일 10초 적어 두면, 진료 날 한 장으로 보여 드려요.')}</b>
       <p>${T('기분 · 잠 · 약을 적어 두면 지난 몇 주가 그래프와 한 장짜리 요약으로 정리돼요. “그동안 어땠어요?”에 기억 대신 기록으로 답할 수 있어요.')}</p>
       <button class="mini" data-act="demoClinic">${T('예시 요약 보기')}</button></section>`;
 
@@ -51,7 +46,7 @@ export function viewToday() {
       <div><div class="over">${sel === t ? longDate(sel) : T('지난 기록')}</div><h1>${sel === t ? T('오늘') : longDate(sel)}</h1></div>
       <button class="icon-btn" data-act="settings" aria-label="${T('설정과 백업')}">${IC.sliders}</button>
     </header>
-    ${ask}${intro}${hint}${sel === t ? backup : ''}
+    ${intro}${hint}${sel === t ? backup : ''}
     ${sel === t && e && e.si >= SI_CARE_FROM ? `<div class="card signal"><i></i><span>${F('죽고 싶은 생각이 강한 날이에요. 혼자 버티지 않아도 돼요. {0}에 전화하거나 다니는 병원에 연락해 보세요.',
     `<a href="tel:${HELPLINE}">${T('109 (자살예방상담전화, 24시간)')}</a>`)}</span></div>` : ''}
     <div class="weekbar">
