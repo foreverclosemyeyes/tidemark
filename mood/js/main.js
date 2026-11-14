@@ -1,7 +1,7 @@
 // 시작점: 누르기·입력 처리와 앱 시작
 import { aiSummary } from './analysis.js';
 import { addDays, today } from './dates.js';
-import { $, app, closeSheet, copyText, enterApp, sheet, sheetOpen, toTop, toast } from './dom.js';
+import { $, app, closeSheet, copyText, enterApp, enterSheet, sheet, sheetOpen, toTop, toast } from './dom.js';
 import { exportData, giveFile, hasAlarms, importData, makeIcs, remind, snoozeBackup } from './files.js';
 import { F, T } from './i18n.js';
 import { lockNow, removePin, setPin } from './lock.js';
@@ -115,7 +115,7 @@ const actions = {
     save(); render();
     toast(F('공황 {0}번째를 적었어요', e.panic));
   },
-  welcomeNext: () => openWelcome(1),
+  welcomeNext: () => welcomeTo(1),
   // 병원·상담용 기능 켜고 끄기 (처음 안내의 물음, 설정의 스위치). 딸린 기록 항목도 한꺼번에 켜고 끈다.
   care: (el) => {
     const on = el.dataset.v ? el.dataset.v === '1' : !careOn(), off = (db.settings.off || []).filter((k) => !CARE_ITEMS.includes(k));
@@ -314,17 +314,25 @@ app.addEventListener('keydown', (ev) => {
 });
 
 // 옆으로 밀면 날짜가 넘어간다: 오늘 탭은 하루씩, 흐름 탭은 한 주(한 달)씩. 미래로는 못 간다.
-onSwipe(app, (step) => {
-  if (ui.tab === 'today') {
-    const next = addDays(ui.selected, step);
-    if (next > today()) return;
-    ui.selected = next;
-  } else if (ui.tab === 'trend') {
-    if (trendRange(shiftAnchor(trend.anchor, step)).start > today()) return;
-    shiftTrend(step);
-  } else return;
-  render();
-  enterApp(step > 0 ? 'next' : 'prev');
+onSwipe(app, {
+  can: (step) => (ui.tab === 'today' ? addDays(ui.selected, step) <= today()
+    : ui.tab === 'trend' ? trendRange(shiftAnchor(trend.anchor, step)).start <= today() : false),
+  go: (step) => {
+    if (ui.tab === 'today') ui.selected = addDays(ui.selected, step); else shiftTrend(step);
+    render();
+    enterApp(step > 0 ? 'next' : 'prev');
+  },
+});
+// 처음 안내도 옆으로 밀어 넘긴다 (다른 시트에서는 밀리지 않는다)
+const WELCOME_LAST = 1;
+function welcomeTo(step) {
+  const from = ui.welcome;
+  openWelcome(step);
+  enterSheet(step > from ? 'next' : 'prev');
+}
+onSwipe(sheet, {
+  can: (step) => ui.welcome != null && ui.welcome + step >= 0 && ui.welcome + step <= WELCOME_LAST,
+  go: (step) => welcomeTo(ui.welcome + step),
 });
 
 // 흐름 그래프에서 날짜 칸을 누르면 그날 값을 보여 준다

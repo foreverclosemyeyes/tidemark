@@ -61,6 +61,23 @@ function seed() {
   // 1. 처음 열기
   await page.goto(url);
   check('처음 열면 안내가 한 장 뜸', !!(await page.$('#sheet .welcome [data-act=welcomeNext]')));
+  // 손가락으로 끌어서 넘기기: 끄는 동안 화면이 따라오고, 충분히 밀고 떼면 넘어간다
+  const drag = (sel, dx, release = true) => page.evaluate(([q, d, up]) => {
+    const el = document.querySelector(q), mk = (x) => new Touch({ identifier: 1, target: el, clientX: x, clientY: 300 });
+    const fire = (type, x, list) => el.dispatchEvent(new TouchEvent(type, { touches: list ? [mk(x)] : [], changedTouches: [mk(x)], bubbles: true, cancelable: true }));
+    fire('touchstart', 200, true);
+    for (let i = 1; i <= 4; i++) fire('touchmove', 200 + d * i / 4, true);
+    if (up) fire('touchend', 200 + d, false);
+  }, [sel, dx, release]);
+  await drag('#sheet .welcome', -150, false);
+  check('안내를 끄는 동안 화면이 손가락을 따라옴', await page.evaluate(() => document.querySelector('#sheet').classList.contains('dragging') && document.querySelector('#sheet').style.getPropertyValue('--drag') === '-150.0px'));
+  await page.evaluate(() => { const el = document.querySelector('#sheet .welcome'); el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [new Touch({ identifier: 1, target: el, clientX: 50, clientY: 300 })], bubbles: true })); });
+  await page.waitForTimeout(450);
+  check('안내를 왼쪽으로 밀면 둘째 장으로 넘어감', (await page.$$('#sheet [data-act=care][data-v]')).length === 2);
+  await drag('#sheet .welcome', 150); await page.waitForTimeout(450);
+  check('오른쪽으로 밀면 첫 장으로 돌아옴', !!(await page.$('#sheet [data-act=welcomeNext]')));
+  await drag('#sheet .welcome', 150); await page.waitForTimeout(450);
+  check('첫 장에서 더 뒤로는 안 넘어감', !!(await page.$('#sheet [data-act=welcomeNext]')) && !(await page.evaluate(() => document.querySelector('#sheet').classList.contains('dragging'))));
   await page.click('[data-act=welcomeNext]');
   check('안내 둘째 장에서 어떻게 쓸지 물어봄', (await page.$$('#sheet [data-act=care][data-v]')).length === 2);
   await page.click('#sheet [data-act=care][data-v="1"]');
@@ -468,6 +485,20 @@ function seed() {
   check('예시를 닫으면 내 진료 화면으로 돌아옴', !!(await page.$('#c-note')) && !!(await page.$('#c-next')));
   await put(kept);
   check('기록이 있으면 소개와 예시 단추가 안 보임', !(await page.$('.intro')) && !(await page.$('[data-act=demo]')));
+
+  // 오늘 화면을 끌면 내용이 따라오고, 조금만 밀고 떼면 날짜가 안 바뀌고 제자리로 돌아온다. 미래 쪽은 조금만 따라온다.
+  await page.click('[data-tab=today]');
+  const h1Before = await text('h1');
+  await drag('#app .tiles', 40); await page.waitForTimeout(300);
+  check('조금만 밀고 떼면 날짜가 그대로이고 제자리로 돌아옴', (await text('h1')) === h1Before && !(await page.evaluate(() => document.querySelector('#app').classList.contains('dragging'))));
+  await drag('#app .tiles', -200, false);
+  check('넘어갈 수 없는 쪽(내일)으로는 조금만 따라옴', await page.evaluate(() => document.querySelector('#app').style.getPropertyValue('--drag') === '-40.0px'));
+  await page.evaluate(() => { const el = document.querySelector('#app .tiles'); el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [new Touch({ identifier: 1, target: el, clientX: 0, clientY: 300 })], bubbles: true })); });
+  await page.waitForTimeout(300);
+  check('내일로는 안 넘어감', (await text('h1')) === h1Before);
+  await drag('#app .tiles', 200); await page.waitForTimeout(450);
+  check('충분히 끌고 떼면 전날로 넘어감', (await text('h1')) !== h1Before);
+  await page.click('[data-act=goToday]');
 
   // 오늘 화면의 네 칸은 수면에 "평소 …"가 붙어도 높이가 같다
   const tileH = await page.$$eval('.tile', (els) => els.map((x) => Math.round(x.getBoundingClientRect().height)));

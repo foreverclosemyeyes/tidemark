@@ -3,6 +3,7 @@
 import { sheet, showSheet } from '../dom.js';
 import { T } from '../i18n.js';
 import { IC } from '../icons.js';
+import { ui } from '../state.js';
 import { db } from '../store.js';
 
 const dots = (step) => `<div class="wl-dots">${[0, 1].map((i) => `<i class="${i === step ? 'on' : ''}"></i>`).join('')}</div>`;
@@ -28,5 +29,6 @@ export function openWelcome(step = 0) {
     ${Object.keys(db.entries).length ? `<p class="secnote">${T('적어 둔 기록은 어느 쪽을 골라도 그대로 있어요.')}</p>` : ''}
     ${dots(1)}`}
   </div>`;
+  ui.welcome = step;
   showSheet();
 }
