@@ -816,6 +816,8 @@ body.layout-bigcal .prank { font-size: 13px; letter-spacing: .02em; color: #0b0b
 .pu-gold { scale: 0; transform-box: fill-box; transform-origin: center; transition: scale .28s cubic-bezier(.2,1.8,.4,1); }
 .pu-gold .f1 { fill: #f6b21b; }
 .pu-gold .f2 { fill: #d98a06; }
+.pu-gold .nw { fill: #fff; transition: opacity .5s .1s; } /* 포인트업으로 새로 자란 꼭짓점 부분 */
+.pu.tout .pu-gold .nw { opacity: 0; }
 .pu.gold .pu-gold { scale: 1; }
 .pu.gold .pu-ring { stroke: #0b0b0b; }
 .pu-lab { position: absolute; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; gap: 3px; rotate: var(--r); scale: 0; opacity: 0; transition: scale .26s cubic-bezier(.2,1.7,.4,1), opacity .12s; transition-delay: calc(.95s + var(--d)); }

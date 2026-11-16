@@ -783,9 +783,13 @@
     // 1점에 실제로 느는 길이는 눈에 안 보일 만큼 작아서(0.3쯤) 이 화면에서는 보이게 크게 내민다
     const gained = {}; for (const c of ups) gained[c.stat] = (gained[c.stat] || 0) + (c.delta || 1);
     const was = Object.fromEntries(STATS.map((st) => [st, Math.max(0, (totals[st] || 0) - (gained[st] || 0))]));
+    // 새로 자란 부분은 하얗게: 원래 끝(tip0)에서 새 끝까지의 화살촉 모양. 글자가 걷힐 때 금색으로 스며듦
+    const tip0 = statStarPts(was, 0, 0, 18, 44, 0.42);
+    const fresh = STATS.map((st) => (gained[st] ? gold.appendChild(svgEl('polygon', { class: 'nw' })) : null));
     const drawGold = (out) => {
       const gp = statStarPts(was, 0, 0, 18, 44, 0.42, STATS.map((st) => (gained[st] ? out : 0)));
       faces.forEach((f, k) => f.setAttribute('points', P([[0, 0], gp[k], gp[(k + 1) % 10]])));
+      fresh.forEach((f, i) => f && f.setAttribute('points', P([gp[(2 * i + 9) % 10], gp[2 * i], gp[2 * i + 1], tip0[2 * i]])));
     };
     drawGold(0);
     svg.append(gold);
