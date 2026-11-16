@@ -608,8 +608,8 @@
   // 능력치 하나의 '자람' 0~1: Lv1 시작 = 0, Lv5 = 1. 등급 사이에서도 조금씩 자람
   const growOf = (v) => { const lv = lvOf(v || 0); if (lv >= 5) return 1; return (lv - 1 + ((v || 0) - LV[lv - 1]) / (LV[lv] - LV[lv - 1])) / 4; };
   // 가운데 별의 꼭짓점 10개: 능력치마다(위·오른쪽·오른쪽 아래·왼쪽 아래·왼쪽) 끝이 그 능력치만큼 뻗음
-  function statStarPts(totals, cx, cy, rMin, rMax, inner = 0.42) {
-    const tip = STATS.map((st) => rMin + (rMax - rMin) * growOf(totals[st]));
+  function statStarPts(totals, cx, cy, rMin, rMax, inner = 0.42, extra = null) { // extra: 능력치별로 끝을 더 내미는 길이 (포인트업 연출용)
+    const tip = STATS.map((st, i) => rMin + (rMax - rMin) * growOf(totals[st]) + (extra ? extra[i] : 0));
     return Array.from({ length: 10 }, (_, k) => {
       const a = -Math.PI / 2 + (k * Math.PI) / 5;
       const i = k >> 1;
@@ -778,8 +778,16 @@
     svg.append(svgEl('polygon', { points: P(starPts(44, 18.5)), class: 'pu-ring r1' }), svgEl('polygon', { points: P(starPts(36, 15)), class: 'pu-ring r2' }));
     // 가운데 금색 별: 면을 번갈아 밝고 어둡게
     const gold = svgEl('g', { class: 'pu-gold' });
-    const gp = statStarPts(totals, 0, 0, 18, 44, 0.42); // 능력치만큼 꼭짓점이 뻗은 별
-    gp.forEach((p, k) => { const q = gp[(k + 1) % 10]; gold.append(svgEl('polygon', { points: P([[0, 0], p, q]), class: k % 2 ? 'f1' : 'f2' })); });
+    const faces = Array.from({ length: 10 }, (_, k) => gold.appendChild(svgEl('polygon', { class: k % 2 ? 'f1' : 'f2' })));
+    // 능력치만큼 꼭짓점이 뻗은 별. 오르기 전 모양에서 시작해서, 음표가 꽂힐 때마다 오른 능력치의 꼭짓점이 뻗어 나감.
+    // 1점에 실제로 느는 길이는 눈에 안 보일 만큼 작아서(0.3쯤) 이 화면에서는 보이게 크게 내민다
+    const gained = {}; for (const c of ups) gained[c.stat] = (gained[c.stat] || 0) + (c.delta || 1);
+    const was = Object.fromEntries(STATS.map((st) => [st, Math.max(0, (totals[st] || 0) - (gained[st] || 0))]));
+    const drawGold = (out) => {
+      const gp = statStarPts(was, 0, 0, 18, 44, 0.42, STATS.map((st) => (gained[st] ? out : 0)));
+      faces.forEach((f, k) => f.setAttribute('points', P([[0, 0], gp[k], gp[(k + 1) % 10]])));
+    };
+    drawGold(0);
     svg.append(gold);
     // 큰 별 다섯 끝의 어두운 그림: 안경(지식) · 번개(배짱) · 톱니(손재주) · 하트(친절) · 반짝임(매력)
     const ICONS = [
@@ -832,8 +840,21 @@
     const at = (ms, cls) => timers.push(setTimeout(() => box.classList.add(cls), ms));
     void box.offsetWidth; // 처음 상태를 한 번 그린 뒤에 시작
     box.classList.add('in');
-    const t = 1000 + (notes - 1) * 170; // 마지막 음표가 꽂힌 뒤에 글자가 나옴
+    const t = 1380 + (notes - 1) * 170; // 마지막 음표가 꽂히고 꼭짓점이 뻗는 게 보인 뒤에 글자가 나옴
     at(780, 'gold'); at(t, 't1'); at(t + 230, 't2'); at(t + 500, 't3'); at(t + 2050, 'tout');
+    // 꼭짓점 뻗기: 음표가 꽂힐 때마다 한 칸씩, 용수철처럼 넘쳤다가 자리 잡음
+    const reach = 8 + notes * 3;
+    let out = 0, vel = 0, goal = 0, last = 0, raf = 0;
+    const spring = (now) => {
+      let n = Math.max(1, Math.min(6, Math.round((now - last) / 16.7))); last = now;
+      while (n--) { vel = (vel + (goal - out) * 0.16) * 0.78; out += vel; }
+      drawGold(out);
+      raf = box.isConnected && (Math.abs(vel) > 0.01 || Math.abs(goal - out) > 0.01) ? requestAnimationFrame(spring) : 0;
+    };
+    for (let k = 0; k < notes; k++) timers.push(setTimeout(() => {
+      goal = (reach * (k + 1)) / notes; vel += 2.4;
+      if (!raf) { last = performance.now(); raf = requestAnimationFrame(spring); }
+    }, 860 + k * 170));
     timers.push(setTimeout(close, t + 2950));
   }
 
