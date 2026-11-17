@@ -87,7 +87,11 @@ function seed() {
   check('다시 열어도 안내가 안 뜸', await page.isHidden('#sheet'));
   check('처음 열면 오늘 화면', (await text('h1')) === '오늘');
   check('빈 날에 기록하기 버튼', await page.isVisible('[data-act=record]'));
-  check('빈 날에는 안 적은 항목이 작은 딱지로 모여 있음', (await page.$$('#app .chip.sm[data-focus]')).length >= 7 && (await page.$$('#app button.li[data-focus]')).length === 0 && (await text('#app [data-focus=appetite]')).includes('식욕'));
+  check('빈 날에도 켜 둔 항목은 모두 줄로 있음 (값은 –)', (await page.$$('#app button.li[data-focus]')).length >= 6 && !(await page.$('#app .chip')) && /식욕\s*–/.test(await text('#app [data-focus=appetite]')));
+  await page.click('#app [data-act=periodToggle]');
+  check('생리 줄을 누르면 바로 켜짐', (await store()).entries[today].period === true && (await text('#app [data-act=periodToggle]')).includes('생리 중'));
+  await page.click('#app [data-act=periodToggle]');
+  check('다시 누르면 꺼지고, 다른 기록이 없으면 그날 기록도 남지 않음', !(await store()).entries[today]);
   await page.click('#app [data-focus=appetite]');
   check('줄을 누르면 그 항목만 뜸 (식욕)', (await text('.st b')) === '식욕' && (await page.$$('#f-appetite')).length === 1 && (await page.$$('#f-mood, [data-flag=period], [data-drink]')).length === 0);
   await page.click('.sheet-top [data-act=close]');
@@ -447,7 +451,7 @@ function seed() {
   await put({ version: 3, entries: {}, meds: [], taken: {}, clinic: { notes: [] }, settings: {} });
   await page.click('[data-act=panicAdd]');
   const panicOf = async () => Object.values((await store()).entries)[0].panic;
-  check('"+ 공황"을 누르면 바로 한 번이 적힘', (await panicOf()) === 1 && !(await page.$('[data-act=panicAdd]')));
+  check('안 적은 날에 공황 줄을 누르면 바로 한 번이 적힘', (await panicOf()) === 1 && !(await page.$('[data-act=panicAdd]')));
   await page.click('.li[data-focus=panic]'); await page.click('[data-panic="1"]'); await page.click('#sheet [data-act=save]');
   check('공황 줄을 눌러 횟수를 고침', (await panicOf()) === 2);
   // 진료 요약: 요일 글자는 네모가 큰 1주에서만 네모 안에 적는다

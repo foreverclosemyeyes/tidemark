@@ -32,6 +32,13 @@ function commitDoses(list) {
 }
 
 // 설정 화면을 스크롤 자리를 지킨 채 다시 그린다
+// 보고 있는 날의 기록. 아직 없으면 빈 기록을 만든다 (그날 먹었다고 눌러 둔 약은 기록 안으로 옮긴다).
+function dayEntry() {
+  const d = ui.selected, e = db.entries[d] || (db.entries[d] = { date: d, meds: (db.taken[d] || []).slice(), signs: {}, note: '' });
+  delete db.taken[d];
+  return e;
+}
+
 let aboutTaps = [];   // 버전 글자를 누른 시각들 (aboutTap)
 
 // 인쇄할 한 장을 지금 기록으로 채운다 (단추를 누를 때와, 브라우저 메뉴로 인쇄할 때). 잠겨 있으면 비워 둔다.
@@ -105,12 +112,20 @@ const actions = {
   },
   // 오늘 화면의 "+ 공황": 기록 화면을 열지 않고 바로 한 번을 더한다 (그날 기록이 없으면 그 한 줄만 있는 기록을 만든다)
   panicAdd: () => {
-    const d = ui.selected, e = db.entries[d] || (db.entries[d] = { date: d, meds: (db.taken[d] || []).slice(), signs: {}, note: '' });
-    delete db.taken[d];
+    const e = dayEntry();
     e.panic = (e.panic || 0) + 1;
     e.updatedAt = new Date().toISOString();
     save(); render();
     toast(F('공황 {0}번째를 적었어요', e.panic));
+  },
+  // 오늘 화면의 생리 줄: 누르면 바로 켜지고 꺼진다. 껐을 때 그날에 다른 기록이 하나도 없으면 그날 기록을 지운다.
+  periodToggle: () => {
+    const e = dayEntry(), plain = ['date', 'meds', 'signs', 'note', 'updatedAt', 'period'];
+    e.period = !e.period;
+    e.updatedAt = new Date().toISOString();
+    const empty = !e.period && !e.note && !e.meds.length && !Object.keys(e.signs || {}).length && !Object.keys(e).some((k) => !plain.includes(k) && e[k] != null && e[k] !== false);
+    if (empty) delete db.entries[e.date];
+    save(); render();
   },
   welcomeNext: () => slide(sheet, 1, () => openWelcome(1)),
   // 방문 수 세기에서 이 폰을 빼거나 다시 넣는다: 설정 맨 아래의 버전 글자를 3초 안에 다섯 번 누른다.

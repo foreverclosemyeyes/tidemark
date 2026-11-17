@@ -446,9 +446,6 @@ input[type=date] { border: 0; outline: none; background: var(--card2); color: va
 .li.chips { flex-wrap: wrap; justify-content: flex-start; gap: 8px; padding: 13px 16px; }
 .chip { background: var(--card2); border-radius: 999px; padding: 8px 15px; font-size: calc(14px * var(--fs, 1.12)); color: var(--muted); }
 .chip[aria-pressed=true] { background: var(--ink); color: var(--ink-inv); font-weight: 600; }
-/* 오늘 화면: 아직 안 적은 항목들을 모아 둔 작은 딱지 */
-.chip.sm { padding: 6px 12px; font-size: calc(12.5px * var(--fs, 1.12)); color: var(--faint); }
-.li.chips.more { gap: 6px; padding: 12px 16px; }
 /* 내 항목: 숫자 칸과 단위, 설정의 새 항목 만들기 */
 .num { display: flex; align-items: baseline; gap: 6px; }
 .num input { width: 84px; border: 0; outline: none; background: var(--card2); color: var(--text); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: calc(16px * var(--fs, 1.12)); text-align: right; -moz-appearance: textfield; }

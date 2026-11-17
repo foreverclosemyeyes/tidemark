@@ -104,9 +104,9 @@ export function tilesHtml(e) {
   return tiles ? `<div class="tiles">${tiles}</div>` : '';
 }
 
-// 오늘의 나머지 항목들. 적은 항목만 줄로 보이고, 안 적은 항목은 맨 아래에 작은 "+ 이름" 딱지로 모아 둔다
-// (줄마다 '기록 없음'을 늘어놓으니 너무 길고 피로하다고 해서 바꿨다, 2026-11-13).
-// 줄이든 딱지든 누르면 그 항목 하나만 고치는 화면이 열린다. 설정에서 꺼 둔 항목은 만들지 않는다.
+// 오늘의 나머지 항목들. 설정에서 켜 둔 항목은 적었든 안 적었든 늘 줄로 있고, 꺼 둔 항목은 없다
+// (한때 안 적은 항목을 맨 아래 "+ 이름" 딱지로 모았는데, 매번 딱지를 눌러 더해야 해서 불편하다고 했다. 길면 설정에서 끄면 된다, 2026-11-17).
+// 줄을 누르면 그 항목 하나만 고치는 화면이 열린다. 생리는 누르면 바로 켜지고 꺼지며, 공황은 안 적은 날에 누르면 바로 한 번이 적힌다.
 export function detailHtml(e) {
   const signs = SIGNS.filter(([k]) => e.signs && e.signs[k]).map(([, label]) => label);
   // 저장된 약 목록에 없는 약(목록에서 지운 약)만 여기 글로 보여 준다. 나머지는 위 약 카드에 있다.
@@ -114,7 +114,7 @@ export function detailHtml(e) {
   const ten = (key, v) => `${nameOf(key, v)}<span class="of"> ${v}</span>`;
   const caffeine = e.drinks ? (cafMg(e.drinks) ? `${drinkText(e.drinks)}<span class="of"> · ${F('약 {0}mg', cafMg(e.drinks))}</span>` : nameOf('caffeine', 0))
     : e.caffeine != null ? ten('caffeine', e.caffeine) : '';
-  // [누르면 열릴 항목, 켜져 있는지, 왼쪽 이름(아이콘 포함), 딱지에 쓸 이름, 값(안 적었으면 '')]
+  // [누르면 열릴 항목, 켜져 있는지, 왼쪽 이름(아이콘 포함), 이름만, 값(안 적었으면 '')]
   const items = [
     ...SYMPTOMS.map(([k, label]) => [k, itemOn(k), label, label, e[k] == null ? '' : `${LEVELS[e[k]]}${bars(e[k])}`]),
     ['panic', itemOn('panic'), T('공황'), T('공황'), e.panic ? F('{0}번', e.panic) : ''],
@@ -124,14 +124,15 @@ export function detailHtml(e) {
     ['caffeine', itemOn('caffeine'), `${IC.coffee}${T('카페인')}`, T('카페인'), caffeine],
     ...customDefs().map((c) => [`c:${c.id}`, true, esc(c.name), esc(c.name), esc(customText(c, (e.custom || {})[c.id]))]),
   ].filter(([, on]) => on);
+  const none = '<span class="none">–</span>';
+  const row = ([key, , left, , value]) => (key === 'period' ? `<button class="li" data-act="periodToggle"><span class="lk">${left}</span><span class="lv">${value || none}</span></button>`
+    : key === 'panic' && !value ? `<button class="li" data-act="panicAdd"><span class="lk">${left}</span><span class="lv">${none}</span></button>` : li(left, value || none, key));
   const rows = [
-    ...items.filter(([, , , , value]) => value).map(([key, , left, , value]) => li(left, value, key)),
+    ...items.map(row),
     e.tired && itemOn('sleep') ? li(`${IC.moon}${T('일어났을 때')}`, T('피곤'), 'sleep') : '',
     extra && itemOn('meds') ? li(`${IC.pill}${T('약')}`, extra) : '',
     signs.length ? li(T('체크'), signs.map(esc).join('<br>')) : '',
-    e.note && itemOn('note') ? `<button class="li say note" data-act="record" data-focus="note">${esc(e.note)}</button>` : '',
+    !itemOn('note') ? '' : e.note ? `<button class="li say note" data-act="record" data-focus="note">${esc(e.note)}</button>` : li(T('메모'), none, 'note'),
   ].join('');
-  const more = [...items.filter(([, , , , value]) => !value).map(([key, , , name]) => [key, name]), ...(!e.note && itemOn('note') ? [['note', T('메모')]] : [])]
-    .map(([key, name]) => (key === 'panic' ? `<button class="chip sm" data-act="panicAdd">+ ${name}</button>` : `<button class="chip sm" data-act="record" data-focus="${key}">+ ${name}</button>`)).join('');
-  return rows || more ? `<section class="card list">${rows}${more ? `<div class="li chips more">${more}</div>` : ''}</section>` : '';
+  return rows ? `<section class="card list">${rows}</section>` : '';
 }
