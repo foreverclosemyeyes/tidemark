@@ -117,6 +117,9 @@ button { border: 0; background: none; padding: 0; cursor: pointer; touch-action:
 .grp .chev { flex: none; width: 8px; height: 8px; margin-right: 4px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; }
 .grp[aria-expanded="true"] .chev { transform: rotate(45deg); }
 /* 설정의 가로 탭: 좁으면 옆으로 밀어서 본다 */
+.med-acts { display: flex; align-items: center; gap: 4px; flex: none; }
+.med-acts .txt { min-width: 0; padding: 6px 9px; }
+.med-acts button[disabled] { opacity: .25; }
 .settabs { display: flex; gap: 6px; margin: 2px 0 16px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .settabs::-webkit-scrollbar { display: none; }
 .settabs button { flex: none; padding: 8px 14px; border-radius: 999px; background: var(--card2); color: var(--muted); font-size: calc(14px * var(--fs, 1.12)); font-weight: 500; white-space: nowrap; }

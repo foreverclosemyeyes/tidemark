@@ -157,6 +157,13 @@ const actions = {
     db.settings.off = off.includes(k) ? off.filter((x) => x !== k) : [...off, k];
     save(); render(); redrawSettings();
   },
+  // 설정: 약의 순서를 한 칸 위나 아래로 (오늘 화면과 진료 요약에 이 순서로 나온다)
+  medMove: (el) => {
+    const i = Number(el.dataset.i), j = i + Number(el.dataset.d);
+    if (j < 0 || j >= db.meds.length) return;
+    [db.meds[i], db.meds[j]] = [db.meds[j], db.meds[i]];
+    save(); render(); redrawSettings();
+  },
   // 설정: 약마다 알람 시각 더하기·지우기 (시각 고치기는 아래 input 처리에서)
   alarmAdd: (el) => { const m = db.meds[Number(el.dataset.m)]; m.alarms = (m.alarms || []).concat('09:00'); save(); redrawSettings(); },
   alarmDel: (el) => { db.meds[Number(el.dataset.m)].alarms.splice(Number(el.dataset.i), 1); save(); redrawSettings(); },
@@ -261,7 +268,7 @@ document.addEventListener('click', (ev) => {
   const d = ui.draft;
   if (!d) return;
   const segEl = t.closest('.seg');
-  if (segEl) {                                   // 단계 버튼 (우울·고조·불안). 고른 것을 다시 누르면 빈 값으로 돌아간다
+  if (segEl) {                                   // 단계 버튼 (스트레스·불안 등). 고른 것을 다시 누르면 빈 값으로 돌아간다
     const f = segEl.dataset.field, v = Number(t.dataset.v);
     d[f] = d[f] === v ? null : v;
     segEl.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === d[f])));

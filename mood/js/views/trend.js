@@ -152,7 +152,7 @@ export function viewTrend() {
       <div class="mnote calkey"><span>${T('가라앉음')} ${scale} ${T('들뜸')}</span><span><i class="pdot"></i> ${T('생리')}</span></div></section>`;
   };
 
-  // 증상(우울·불안)은 기분과 같은 선 그래프로, 0(없음)~4(매우 높음)
+  // 증상(스트레스·불안)은 기분과 같은 선 그래프로, 0(없음)~4(매우 높음)
   // 평소에는 이름만 보이고, 날짜를 누르면 그날 단계가 나온다
   const symCard = (key, name) => lineCard(key, name, 4, [[0, ''], [2, ''], [4, '']],
     `<div class="mt">${name}</div>${pickDate ? `<div class="mv"><b>${pickE && pickE[key] != null ? LEVELS[pickE[key]] : '–'}</b><span>${pickLabel}</span></div>` : '<div class="mv"></div>'}`);

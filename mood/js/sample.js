@@ -20,7 +20,7 @@ export function sampleEntries() {
       sleepMin, tired: !high && sleepMin < 400, period, caffeine: caf ? 8 : 3, appetite: caf ? 3 : 6,
       meds: i <= 20 && i % 9 !== 4 ? [sampleMed()] : [],
       note: i === 2 ? T('할 일을 한꺼번에 많이 벌임') : i === 17 ? T('하루 종일 누워 있었음') : '',
-      bed: high ? '23:30' : '00:40', dep: high ? 0 : i >= 20 ? 3 : 1, anx: caf ? 3 : 1, psy: i < 3 ? 1 : null, psych: i < 3 ? { voices: true } : undefined, si: 0, signs: high ? { racing: true, projects: i % 2 === 0 } : {},
+      bed: high ? '23:30' : '00:40', dep: high ? 0 : i >= 20 ? 3 : 1, stress: caf ? 3 : i % 3, anx: caf ? 3 : 1, psy: i < 3 ? 1 : null, psych: i < 3 ? { voices: true } : undefined, si: 0, signs: high ? { racing: true, projects: i % 2 === 0 } : {},
     };
   }
   return out;

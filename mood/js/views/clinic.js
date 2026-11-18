@@ -47,7 +47,7 @@ function nextText() {
 }
 
 // 큰 그래프에 켜고 끌 수 있는 선들: [열쇠, 이름, 가장 높은 값]. 증상(0~4)은 그래프 높이에 맞춰 늘려 그린다.
-// 0~10으로 적는 세 가지만 선으로 그린다. 증상(우울·불안 등)은 바로 아래 네모 줄에 있어서, 선으로 또 그리면 겹쳐서 난잡하다고 해서 뺐다 (2026-11-14).
+// 0~10으로 적는 세 가지만 선으로 그린다. 증상(스트레스·불안 등)은 바로 아래 네모 줄에 있어서, 선으로 또 그리면 겹쳐서 난잡하다고 해서 뺐다 (2026-11-14).
 // 설정에서 꺼 둔 항목은 뺀다.
 export const lineDefs = () => [['mood', T('기분'), 10], ['energy', T('에너지'), 10], ['conf', T('자신감'), 10]].filter(([key]) => itemOn(key));
 
@@ -191,7 +191,7 @@ export function summaryRows(s) {
   const num = (x) => (Number.isInteger(x) ? String(x) : one(x));
   const dur = (m) => durText(Math.round(m));
   const flags = [
-    [T('우울 높음 이상'), s.high.dep], [T('불안 높음 이상'), s.high.anx],
+    [T('스트레스 높음 이상'), s.high.stress], [T('불안 높음 이상'), s.high.anx],
     [T('정신병적 증상'), s.high.psy], [T('죽고 싶은 생각'), s.high.si], [T('5시간 미만 수면'), s.shortSleep], [T('생리'), s.period],
   ].filter(([, list]) => list.length).map(([name, list]) => [name, `${F('{0}일', list.length)} · ${dateList(list)}`]);
   return {

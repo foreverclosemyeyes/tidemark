@@ -29,7 +29,9 @@ export function openSettings() {
   // 약마다: 이름·용량, 삭제, 그리고 알람 시각들 (캘린더 알림 파일에 들어간다)
   const meds = db.meds.map((m, mi) => `<div class="li col">
       <div class="slh"><span class="lk">${IC.pill}${esc(m.name)}<small>${esc(m.dose || '')}</small></span>
-        <button class="txt dim" data-act="delMed" data-med="${esc(medKey(m))}">${T('삭제')}</button></div>
+        <span class="med-acts">${db.meds.length > 1 ? `<button class="txt dim" data-act="medMove" data-i="${mi}" data-d="-1" aria-label="${T('위로')}"${mi === 0 ? ' disabled' : ''}>↑</button>
+          <button class="txt dim" data-act="medMove" data-i="${mi}" data-d="1" aria-label="${T('아래로')}"${mi === db.meds.length - 1 ? ' disabled' : ''}>↓</button>` : ''}
+          <button class="txt dim" data-act="delMed" data-med="${esc(medKey(m))}">${T('삭제')}</button></span></div>
       <div class="doses alarms">${(m.alarms || []).map((time, i) => `<span class="dose"><input type="time" class="alarm-at" data-m="${mi}" data-i="${i}" value="${esc(time)}" aria-label="${T('알람 시각')}">
         <button type="button" data-act="alarmDel" data-m="${mi}" data-i="${i}" aria-label="${T('삭제')}">✕</button></span>`).join('')}
         <button type="button" class="mini" data-act="alarmAdd" data-m="${mi}">${T('+ 알람')}</button></div>

@@ -137,6 +137,7 @@ export function recentState(entries = db.entries) {
   add(psyDays, 1, '정신병적 증상이 있던 날 {0}일');
   add(n((e) => e.panic > 0), 1, '공황이 있던 날 {0}일');
   add(anxDays, 3, '불안이 보통 이상인 날 {0}일');
+  add(n((e) => e.stress >= 3), 3, '스트레스가 높은 날 {0}일');
   add(n((e) => e.sleepMin != null && e.sleepMin < SHORT_SLEEP), 2, '5시간 미만으로 잔 밤 {0}일');
   // 하루 사이에 잠이 3시간 넘게 달라진 날: 큰 기분 변화에 하루쯤 앞서 나타나기도 한다 [근거 5]
   const withSleep = span(8, 0).filter((e) => e.sleepMin != null);
@@ -234,7 +235,7 @@ export function periodPhases(entries = db.entries) {
     return m[0] != null && have.length >= 3 && Math.max(...have) - Math.min(...have) >= gap ? [[name, ...m.map((x) => (x == null ? '–' : fmt(x)))]] : [];
   };
   const one = (x) => x.toFixed(1);
-  const rows = [...row(itemOn('mood'), T('기분'), 'mood', 0.8, one), ...row(itemOn('energy'), T('에너지'), 'energy', 0.8, one), ...row(itemOn('dep'), T('우울'), 'dep', 0.6, one),
+  const rows = [...row(itemOn('mood'), T('기분'), 'mood', 0.8, one), ...row(itemOn('energy'), T('에너지'), 'energy', 0.8, one), ...row(itemOn('stress'), T('스트레스'), 'stress', 0.6, one),
     ...row(itemOn('anx'), T('불안'), 'anx', 0.6, one), ...row(itemOn('sleep'), T('잠'), 'sleepMin', 30, hm)];
   return rows.length ? { cycles: starts.length, head: groups.map((g) => g.length), rows } : null;
 }
@@ -310,7 +311,7 @@ export function medChanges() {
     return {
       date: x.date, text: x.text, after: a.length,
       rows: [[T('기분'), cell(b, 'mood', num), cell(a, 'mood', num)], [T('에너지'), cell(b, 'energy', num), cell(a, 'energy', num)], [T('잠'), cell(b, 'sleepMin', dur), cell(a, 'sleepMin', dur)],
-        [T('우울이 보통 이상'), count(b, (e) => e.dep >= 2), count(a, (e) => e.dep >= 2)], [T('불안이 보통 이상'), count(b, (e) => e.anx >= 2), count(a, (e) => e.anx >= 2)]],
+        [T('스트레스가 보통 이상'), count(b, (e) => e.stress >= 2), count(a, (e) => e.stress >= 2)], [T('불안이 보통 이상'), count(b, (e) => e.anx >= 2), count(a, (e) => e.anx >= 2)]],
     };
   }).filter(Boolean).reverse();
 }
@@ -323,12 +324,12 @@ export function aiSummary() {
     if (!e) { if (meds) lines.push(`${d} | (기록 없음) | 약: ${meds}`); continue; }
     const signs = SIGNS.filter(([k]) => e.signs && e.signs[k]).map(([, l]) => l).join(', ');
     const val = (label, v, unit) => (v == null ? '' : `${label} ${v}${unit || ''}`);   // 안 적은 항목은 줄에서 뺀다
-    lines.push([d, val('기분', e.mood), val('에너지', e.energy), val('자신감', e.conf), val('우울', e.dep, '/4'), val('불안', e.anx, '/4'), val('공황', e.panic, '번'), psyNames(e.psych).length ? `정신병적 증상: ${psyNames(e.psych).join(', ')}` : val('정신병적 증상', e.psy, '/4'), val('죽고 싶은 생각', e.si, '/4'),
+    lines.push([d, val('기분', e.mood), val('에너지', e.energy), val('자신감', e.conf), val('스트레스', e.stress, '/4'), val('우울', e.dep, '/4'), val('불안', e.anx, '/4'), val('공황', e.panic, '번'), psyNames(e.psych).length ? `정신병적 증상: ${psyNames(e.psych).join(', ')}` : val('정신병적 증상', e.psy, '/4'), val('죽고 싶은 생각', e.si, '/4'),
       e.sleepMin != null ? `수면 ${Math.floor(e.sleepMin / 60)}시간 ${e.sleepMin % 60}분${aided(e) ? '(전날 안정제·수면제 복용)' : ''}` : '', e.tired ? '기상 시 피곤' : '', e.period ? '생리 중' : '',
       e.appetite != null ? `식욕 ${e.appetite}` : '', e.drinks ? `카페인 약 ${cafMg(e.drinks)}mg(${drinkText(e.drinks) || '없음'})` : e.caffeine != null ? `카페인 ${e.caffeine}/10` : '', `약: ${meds || '없음'}`, fxNames(e.fx).length ? `부작용: ${fxNames(e.fx).join(', ')}` : '', ...(e.custom ? customDefs().map((c) => (customText(c, e.custom[c.id]) ? `${c.name}: ${customText(c, e.custom[c.id])}` : '')) : []), signs ? `체크: ${signs}` : '', e.note ? `메모: ${e.note}` : '']
       .filter(Boolean).join(' | '));
   }
-  return `아래는 내가 직접 적은 최근 4주 기분·수면·복약 기록이야 (기분·에너지·자신감·식욕·카페인은 0~10, 우울·불안·죽고 싶은 생각은 0~4).
+  return `아래는 내가 직접 적은 최근 4주 기분·수면·복약 기록이야 (기분·에너지·자신감·식욕·카페인은 0~10, 스트레스·불안·죽고 싶은 생각은 0~4).
 진단은 하지 말고, 눈에 띄는 패턴과 진료 때 의사에게 이야기하거나 물어볼 만한 점을 쉬운 말로 정리해 줘.
 
 ${lines.join('\n') || '(기록 없음)'}`;
@@ -353,7 +354,7 @@ export function summary(weeks, demo) {
   return {
     weeks, dates, days, got,
     mood: stat('mood'), energy: stat('energy'), conf: stat('conf'), sleep: stat('sleepMin'),
-    high: { dep: when('dep', 3), anx: when('anx', 3), psy: when('psy', 1), si: when('si', 1) },
+    high: { stress: when('stress', 3), anx: when('anx', 3), psy: when('psy', 1), si: when('si', 1) },
     shortSleep: got.filter((e) => e.sleepMin != null && e.sleepMin < SHORT_SLEEP).map((e) => e.date),
     signs: SIGNS.map(([k, label]) => [label, got.filter((e) => e.signs && e.signs[k]).length]).filter(([, c]) => c),
     psych: [...new Set(got.flatMap((e) => Object.keys(e.psych || {}).filter((k) => e.psych[k])))].map((k) => [psyName(k), got.filter((e) => e.psych && e.psych[k]).length]),

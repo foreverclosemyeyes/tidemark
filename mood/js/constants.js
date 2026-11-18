@@ -4,7 +4,9 @@ import { EN, T } from './i18n.js';
 export const LEVELS = [T('없음'), T('약간'), T('보통'), T('높음'), T('매우 높음')];
 // si(죽고 싶은 생각)는 진료 때 꼭 필요한 정보라 다른 증상과 같은 5단계로 적는다. 문구는 담담하게, 판단 없이.
 // "고조(들뜸)"는 기분·에너지와 겹쳐서 뺐다 (2026-11-13). 예전 기록에 남아 있는 값(elev)은 쓰지 않고, 그 날을 다시 저장하면 빠진다.
-export const SYMPTOMS = [['dep', T('우울')], ['anx', T('불안')], ['si', T('죽고 싶은 생각')]];
+// 우울 항목은 스트레스로 바꿨다 (사용자가 정함, 2026-11-18: 기분 점수가 있어서 우울은 겹친다). 예전 기록의 dep 값은 지우지 않고 그대로 두며,
+// 화면에는 더 나오지 않지만 인사이트의 "최근 7일" 읽기는 예전 값이 있으면 계속 참고한다.
+export const SYMPTOMS = [['stress', T('스트레스')], ['anx', T('불안')], ['si', T('죽고 싶은 생각')]];
 // 정신병적 증상은 단계가 아니라, 그날 있었던 것을 하나씩 눌러 적는다 (entry.psych = { 열쇠: true }). 목록에 없으면 직접 적는다 ('c:이름', settings.psyCustom).
 // 그날 몇 가지였는지는 entry.psy(1~4, 없으면 null)에 같이 적어 둔다. 그림과 인사이트는 이 숫자를 쓴다.
 export const PSYCH = [
@@ -14,7 +16,7 @@ export const PSYCH = [
 // 기록 항목: 설정에서 하나씩 끌 수 있다 (끄면 기록·오늘·흐름·진료 화면에서 안 보인다. 적어 둔 값은 지우지 않는다).
 export const ITEMS = [
   ['mood', T('기분')], ['energy', T('에너지')], ['conf', T('자신감')], ['sleep', T('수면')],
-  ['dep', T('우울')], ['anx', T('불안')], ['panic', T('공황')], ['psy', T('정신병적 증상')], ['si', T('죽고 싶은 생각')],
+  ['stress', T('스트레스')], ['anx', T('불안')], ['panic', T('공황')], ['psy', T('정신병적 증상')], ['si', T('죽고 싶은 생각')],
   ['period', T('생리')], ['appetite', T('식욕')], ['caffeine', T('카페인')], ['meds', T('약')],
   ['fx', T('부작용')], ['signs', T('들뜸 체크리스트')], ['note', T('메모')],
 ];
@@ -133,6 +135,6 @@ export const FONTS = {
 export const SIZES = { s: [T('작게'), 1], m: [T('보통 '), 1.12], l: [T('크게'), 1.25], xl: [T('아주 크게'), 1.4] };
 
 // 병원·상담에 다니는 사람에게만 필요한 기록 항목들. "병원 · 상담용 기능"을 끄면 같이 꺼지고, 켜면 같이 켜진다.
-export const CARE_ITEMS = ['dep', 'anx', 'panic', 'psy', 'si', 'meds', 'fx', 'signs'];
+export const CARE_ITEMS = ['anx', 'panic', 'psy', 'si', 'meds', 'fx', 'signs'];
 
 export const DISCLAIMER = T('이 앱은 진단 도구가 아니에요. 내 상태를 기록해 두는 참고용이에요.');
