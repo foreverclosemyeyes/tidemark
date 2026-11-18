@@ -8,16 +8,42 @@ const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/cli
 const { auth } = require('@modelcontextprotocol/sdk/client/auth.js');
 
 const SERVER = 'https://mcp.notion.com/mcp';
+const RELOGIN = '노션 로그인이 풀렸어요. 다시 로그인해 주세요.';
 const PORT = 47823;
 const REDIRECT = `http://127.0.0.1:${PORT}/callback`;
 
+// 토큰 갱신 요청이 겹치지 않게 하는 fetch.
+// 노션은 갱신용 토큰(refresh_token)을 한 번 쓰면 새 것으로 바꿔 준다. 접속이 여럿(요청 + 알림 스트림)이라
+// 토큰이 만료되는 순간 갱신 요청이 둘 나갈 수 있는데, 둘째는 '이미 쓴 토큰'이라 거절되고(invalid_grant)
+// 그러면 로그인 자체가 지워진다. → 같은 토큰으로 하는 갱신은 한 번만 보내고, 그 답을 같이 쓴다.
+function refreshOnce(baseFetch) {
+  const seen = new Map(); // refresh_token → 진행 중이거나 방금 끝난 갱신
+  return async (url, init) => {
+    const body = init && init.body;
+    const params = body instanceof URLSearchParams ? body : typeof body === 'string' ? new URLSearchParams(body) : null;
+    if (!params || params.get('grant_type') !== 'refresh_token') return baseFetch(url, init);
+    const key = params.get('refresh_token');
+    if (!seen.has(key)) {
+      const job = baseFetch(url, init).then(async (res) => ({ status: res.status, type: res.headers.get('content-type') || 'application/json', body: await res.text() }));
+      seen.set(key, job);
+      // 성공한 답은 잠시 들고 있음 (조금 늦게 온 같은 요청에도 같은 새 토큰을 줌). 실패는 바로 잊음
+      job.then((r) => { if (r.status >= 400) seen.delete(key); else { const t = setTimeout(() => seen.delete(key), 5 * 60 * 1000); if (t.unref) t.unref(); } }, () => seen.delete(key));
+    }
+    const r = await seen.get(key);
+    return new Response(r.body, { status: r.status, headers: { 'content-type': r.type } });
+  };
+}
+
 class NotionMcp {
-  /** @param {{load:()=>object, save:(o:object)=>void, open:(url:string)=>void}} io */
+  /** @param {{load:()=>object, save:(o:object)=>void, open:(url:string)=>void, fetch?:Function}} io */
   constructor(io) {
     this.io = io;
     this.client = null;
+    this.connecting = null;
     this.tools = null;
     this.verifier = null;
+    this.loggingIn = false;
+    this.fetch = refreshOnce(io.fetch || ((...a) => fetch(...a)));
     const self = this;
     this.provider = {
       get redirectUrl() { return REDIRECT; },
@@ -33,20 +59,26 @@ class NotionMcp {
       clientInformation: () => self.io.load().client,
       saveClientInformation: (c) => self.io.save({ ...self.io.load(), client: c }),
       tokens: () => self.io.load().tokens,
-      saveTokens: (t) => self.io.save({ ...self.io.load(), tokens: t }),
-      redirectToAuthorization: (url) => self.io.open(url.toString()),
+      saveTokens: (t) => { const d = self.io.load(); delete d.expired; self.io.save({ ...d, tokens: t }); },
+      // 브라우저는 사람이 '노션으로 로그인'을 눌렀을 때만 연다 (갱신에 잠깐 실패했다고 로그인 창이 불쑥 뜨지 않게)
+      redirectToAuthorization: (url) => { if (self.loggingIn) self.io.open(url.toString()); },
       saveCodeVerifier: (v) => { self.verifier = v; },
       codeVerifier: () => self.verifier,
       invalidateCredentials: (scope) => {
         const d = self.io.load();
         if (scope === 'all' || scope === 'client') delete d.client;
-        if (scope === 'all' || scope === 'tokens') delete d.tokens;
+        if (scope === 'all' || scope === 'tokens') {
+          if (d.tokens && !self.loggingIn) d.expired = true; // 쓰던 로그인이 풀림 → '다시 로그인' 안내용 표시
+          delete d.tokens;
+        }
         self.io.save(d);
       },
     };
   }
 
   loggedIn() { return !!(this.io.load().tokens); }
+  // 로그인해서 쓰다가 풀린 상태 (직접 로그아웃한 것과 구분: 이때는 노션 없이 쓰기로 넘어가지 않고 다시 로그인을 안내)
+  needsLogin() { const d = this.io.load(); return !d.tokens && !!d.expired; }
 
   // 브라우저로 노션 로그인 → 127.0.0.1 로 돌아온 code 를 받아 토큰으로 바꿈
   async login() {
@@ -65,29 +97,51 @@ class NotionMcp {
       server.listen(PORT, '127.0.0.1');
       setTimeout(() => reject(Object.assign(new Error('timeout'), { friendly: '5분 안에 로그인이 끝나지 않았어요. 다시 해 주세요.' })), 5 * 60 * 1000);
     });
+    this.loggingIn = true;
     try {
-      const first = await auth(this.provider, { serverUrl: SERVER });
-      if (first === 'AUTHORIZED') return true;
-      const code = await codePromise;
-      const r = await auth(this.provider, { serverUrl: SERVER, authorizationCode: code });
-      this.client = null;
-      return r === 'AUTHORIZED';
+      const first = await auth(this.provider, { serverUrl: SERVER, fetchFn: this.fetch });
+      if (first !== 'AUTHORIZED') {
+        const code = await codePromise;
+        if (await auth(this.provider, { serverUrl: SERVER, authorizationCode: code, fetchFn: this.fetch }) !== 'AUTHORIZED') return false;
+      }
+      this.drop();
+      return true;
     } finally {
+      this.loggingIn = false;
+      codePromise.catch(() => {}); // 먼저 끝난 경우 남은 대기(5분 제한)가 오류로 새지 않게
       try { server && server.close(); } catch { /* 이미 닫힘 */ }
     }
   }
 
-  logout() { this.io.save({}); this.client = null; this.tools = null; }
+  logout() { this.io.save({}); this.drop(); this.tools = null; }
 
-  async connect() {
-    if (this.client) return this.client;
-    const transport = new StreamableHTTPClientTransport(new URL(SERVER), { authProvider: this.provider });
-    const client = new Client({ name: 'work-diary', version: '1.0.0' });
-    await client.connect(transport);
-    const { tools } = await client.listTools();
-    this.tools = tools.map((t) => t.name);
-    this.client = client;
-    return client;
+  // 쓰던 접속을 버림. 그냥 놓기만 하면 옛 접속의 알림 스트림이 살아서 혼자 토큰 갱신을 시도하므로 꼭 닫는다
+  drop() {
+    const old = this.client;
+    this.client = null;
+    if (old) Promise.resolve().then(() => old.close()).catch(() => {});
+  }
+
+  // 접속은 하나만: 동시에 여러 곳에서 불러도 같은 접속을 기다림
+  connect() {
+    if (this.client) return Promise.resolve(this.client);
+    if (!this.connecting) {
+      this.connecting = (async () => {
+        const transport = new StreamableHTTPClientTransport(new URL(SERVER), { authProvider: this.provider, fetch: this.fetch });
+        const client = new Client({ name: 'work-diary', version: '1.0.0' });
+        try {
+          await client.connect(transport);
+          const { tools } = await client.listTools();
+          this.tools = tools.map((t) => t.name);
+        } catch (e) {
+          Promise.resolve().then(() => client.close()).catch(() => {});
+          throw e;
+        }
+        this.client = client;
+        return client;
+      })().finally(() => { this.connecting = null; });
+    }
+    return this.connecting;
   }
 
   tool(suffix) {
@@ -97,12 +151,13 @@ class NotionMcp {
   }
 
   async call(suffix, args) {
+    if (!this.loggedIn()) throw wrap(new Error('unauthorized'), false);
     let client;
-    try { client = await this.connect(); } catch (e) { throw wrap(e); }
+    try { client = await this.connect(); } catch (e) { throw wrap(e, this.loggedIn()); }
     let res;
     try { res = await client.callTool({ name: this.tool(suffix), arguments: args }); } catch (e) {
-      this.client = null; // 다음에 다시 연결
-      throw wrap(e);
+      if (this.client === client) this.drop(); // 다음에 다시 연결
+      throw wrap(e, this.loggedIn());
     }
     const text = (res.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
     if (res.isError) throw Object.assign(new Error(text), { friendly: `노션 오류: ${text.slice(0, 120)}` });
@@ -127,10 +182,16 @@ class NotionMcp {
   }
 }
 
-function wrap(e) {
+// stillLoggedIn: 오류가 난 뒤에도 로그인 정보가 남아 있는가. 남아 있으면 로그인이 풀린 게 아니라
+// 갱신에 잠깐 실패한 것(네트워크·노션 서버)이라 다음 동기화 때 다시 된다
+function wrap(e, stillLoggedIn = false) {
   if (e && e.friendly) return e;
   const msg = String((e && e.message) || e);
-  if (/401|unauthor|invalid_token|invalid_grant/i.test(msg)) return Object.assign(new Error(msg), { friendly: '노션 로그인이 풀렸어요. SETTING > 연결에서 "노션으로 로그인"을 다시 눌러 주세요.', relogin: true });
+  if (/401|unauthor|invalid_token|invalid_grant/i.test(msg)) {
+    return stillLoggedIn
+      ? Object.assign(new Error(msg), { friendly: '노션에 잠깐 연결하지 못했어요. 곧 다시 시도해요.' })
+      : Object.assign(new Error(msg), { friendly: RELOGIN, relogin: true });
+  }
   if (/fetch failed|ENOTFOUND|ECONN/i.test(msg)) return Object.assign(new Error(msg), { friendly: '인터넷 연결을 확인해 주세요.' });
   return Object.assign(new Error(msg), { friendly: `노션 연결 오류: ${msg.slice(0, 120)}` });
 }
@@ -249,4 +310,4 @@ function locateMark(anchors, mark) {
   throw Object.assign(new Error('anchor moved'), { friendly: '그 사이 내용이 바뀌었어요. 다시 해 주세요.' });
 }
 
-module.exports = { NotionMcp, parseMarkdown, cleanText, escapeText, lastLine, markOf, locateMark, REDIRECT };
+module.exports = { NotionMcp, refreshOnce, RELOGIN, parseMarkdown, cleanText, escapeText, lastLine, markOf, locateMark, REDIRECT };

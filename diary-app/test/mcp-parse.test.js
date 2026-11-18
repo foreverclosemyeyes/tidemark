@@ -134,3 +134,42 @@ console.log('✓ 노션 로그인(MCP) 마크다운 파싱 테스트 통과');
   assert.throws(() => markOf(p1.anchors, 'P:2026-11-16:99'), /no anchor/);
   console.log('✓ 번호가 밀려도 같은 줄 찾기 테스트 통과');
 }
+
+// 노션 로그인 유지: 갱신 요청이 겹쳐도 한 번만 나가고, 로그인이 풀리면 조용히 사라지지 않고 표시가 남음
+(async () => {
+  const { NotionMcp, refreshOnce } = require('../main/notionMcp');
+  let sent = 0;
+  const server = async (_url, init) => { // 노션처럼: 갱신용 토큰은 한 번만 쓸 수 있음
+    sent++;
+    await new Promise((r) => setTimeout(r, 20));
+    const tok = init.body instanceof URLSearchParams ? init.body.get('refresh_token') : null;
+    return tok === 'R1' ? new Response(JSON.stringify({ access_token: 'A2', refresh_token: 'R2' }), { status: 200, headers: { 'content-type': 'application/json' } })
+      : new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400, headers: { 'content-type': 'application/json' } });
+  };
+  const f = refreshOnce(server);
+  const req = (tok) => f('https://x/token', { method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tok }) });
+  const [a, b] = await Promise.all([req('R1'), req('R1')]);           // 겹친 갱신 둘
+  assert.strictEqual(sent, 1, '같은 토큰의 갱신은 한 번만 보냄');
+  assert.deepStrictEqual([a.status, b.status], [200, 200]);
+  assert.strictEqual((await a.json()).refresh_token, 'R2'); assert.strictEqual((await b.json()).refresh_token, 'R2');
+  assert.strictEqual((await (await req('R1')).json()).access_token, 'A2', '조금 늦게 온 같은 요청도 같은 답');
+  assert.strictEqual(sent, 1);
+  assert.strictEqual((await req('OLD')).status, 400); assert.strictEqual((await req('OLD')).status, 400);
+  assert.strictEqual(sent, 3, '실패한 답은 들고 있지 않음');
+  await f('https://x/other', { method: 'POST', body: 'a=1' }); assert.strictEqual(sent, 4, '갱신이 아닌 요청은 그대로');
+
+  let saved = { tokens: { access_token: 'A', refresh_token: 'R' }, client: { client_id: 'c' } }; const opened = [];
+  const m = new NotionMcp({ load: () => ({ ...saved }), save: (o) => { saved = o; }, open: (u) => opened.push(u) });
+  assert.ok(m.loggedIn() && !m.needsLogin());
+  m.provider.redirectToAuthorization(new URL('https://notion.example/authorize'));
+  assert.deepStrictEqual(opened, [], '로그인을 누르지 않았으면 브라우저를 열지 않음');
+  m.provider.invalidateCredentials('tokens');                          // 갱신이 거절돼 로그인이 풀림
+  assert.ok(!m.loggedIn() && m.needsLogin(), '풀린 상태로 표시');
+  assert.ok(saved.client, '등록 정보는 남음');
+  await assert.rejects(m.call('notion-fetch', { id: 'x' }), (e) => e.relogin === true && /다시 로그인/.test(e.friendly));
+  m.provider.saveTokens({ access_token: 'B', refresh_token: 'S' });    // 다시 로그인
+  assert.ok(m.loggedIn() && !m.needsLogin());
+  m.logout();
+  assert.ok(!m.loggedIn() && !m.needsLogin(), '직접 로그아웃한 건 풀린 게 아님');
+  console.log('✓ 노션 로그인 유지 테스트 통과');
+})().catch((e) => { console.error(e); process.exit(1); });

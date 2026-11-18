@@ -19,7 +19,7 @@ const weekly = require('./weekly');
 const docsLib = require('./docs');
 const packLib = require('./pack');
 const updater = require('./updater');
-const { NotionMcp, parseMarkdown, cleanText, escapeText, lastLine, markOf, locateMark } = require('./notionMcp');
+const { NotionMcp, RELOGIN, parseMarkdown, cleanText, escapeText, lastLine, markOf, locateMark } = require('./notionMcp');
 
 // ---------- 오류 기록 (문제가 생기면 원인을 알 수 있게) ----------
 let logFile = null;
@@ -88,6 +88,7 @@ function snapshot() {
     lastSync: state.lastSync,
     syncing: state.syncing,
     error: state.error,
+    relogin: !!state.relogin, // 노션 로그인이 풀림 → 화면에서 바로 다시 로그인할 수 있게
     needsSetup: state.needsSetup,
     local: state.local,
   };
@@ -109,8 +110,10 @@ const LOCAL_WEEK = 'local';
 const newId = () => 'l' + crypto.randomBytes(6).toString('hex');
 function notionReady() {
   const c = cfg();
-  return !!(c.dataSourceId && c.userId) && (secrets.has('notion') || !!(mcp && mcp.loggedIn()));
+  // 로그인이 풀린 상태(needsLogin)도 노션 쪽으로 침: 조용히 '노션 없이 쓰기'로 넘어가지 않고, 받아 둔 내용을 보여 주며 다시 로그인을 안내
+  return !!(c.dataSourceId && c.userId) && (secrets.has('notion') || !!(mcp && (mcp.loggedIn() || mcp.needsLogin())));
 }
+const notConnected = () => (mcp && mcp.needsLogin() ? RELOGIN : '노션이 연결되지 않았어요.');
 function loadLocal() {
   Object.assign(state, {
     local: true, needsSetup: false, error: null, syncing: false, events: [],
@@ -206,7 +209,7 @@ async function doSync(force) {
     state.weeks = weeks;
     applyPending();
     state.lastSync = new Date().toISOString();
-    state.error = null;
+    state.error = null; state.relogin = false;
     updateStats();
     cache.set('snapshot', { quests: state.quests, events: state.events, weeks: state.weeks, lastSync: state.lastSync });
   } catch (e) {
@@ -282,6 +285,12 @@ function rekeyPending() {
 
 const syncViaMcp = () => mcpSerial(readViaMcp);
 async function readViaMcp() {
+  if (!mcp.loggedIn()) { // 로그인이 풀림: 받아 둔 내용은 그대로 두고 안내만
+    Object.assign(state, { needsSetup: false, syncing: false, error: RELOGIN, relogin: true });
+    lastSyncAt = Date.now();
+    pushData();
+    return;
+  }
   state.needsSetup = false;
   state.syncing = true;
   pushData();
@@ -325,11 +334,12 @@ async function readViaMcp() {
     state.weeks = weeks;
     applyPending();
     state.lastSync = new Date().toISOString();
-    state.error = null;
+    state.error = null; state.relogin = false;
     updateStats();
     cache.set('snapshot', { quests: state.quests, events: state.events, weeks: state.weeks, lastSync: state.lastSync });
   } catch (e) {
     state.error = e.friendly || e.message;
+    state.relogin = !!e.relogin || mcp.needsLogin();
     console.error('[mcp sync]', e);
   } finally {
     state.syncing = false;
@@ -506,7 +516,7 @@ async function deleteTodo(id) {
       await mcpWrite(mark.pageId, () => { const a = locateMark(mcpAnchors, mark); return [a.delOld, a.delNew]; });
       pushData(); // 쓰고 나서 그 페이지를 다시 풀어 둔 상태
       return { ok: true };
-    } else throw Object.assign(new Error('no notion'), { friendly: '노션이 연결되지 않았어요.' });
+    } else throw Object.assign(new Error('no notion'), { friendly: notConnected() });
     removeLocal(); pushData();
     sync(true);
     return { ok: true };
@@ -539,7 +549,7 @@ async function editTodo(id, text) {
       });
       pushData();
       return { ok: true };
-    } else throw Object.assign(new Error('no notion'), { friendly: '노션이 연결되지 않았어요.' });
+    } else throw Object.assign(new Error('no notion'), { friendly: notConnected() });
     setLocal(); pushData();
     sync(true);
     return { ok: true };
@@ -679,7 +689,7 @@ async function addTodo(date, text) {
       pushData();
       return { ok: true, created };
     } else {
-      return { ok: false, message: '노션이 연결되지 않았어요.' };
+      return { ok: false, message: notConnected() };
     }
     await sync(true);
     return { ok: true, created };
@@ -706,7 +716,7 @@ async function toggleTodo(blockId, checked) {
         return /- \[x\]/i.test(lastLine(a.newStr)) === checked ? [a.oldStr, a.newStr] : null; // 이미 원하는 상태면 그대로
       });
       settle(); mcpReparse(mark.pageId); pushData(); // 대기를 걷어 낸 실제 내용으로
-    } else if (!token) throw Object.assign(new Error('no key'), { friendly: '노션이 연결되지 않았어요.' });
+    } else if (!token) throw Object.assign(new Error('no key'), { friendly: notConnected() });
     else { await new notion.NotionClient(token).setTodo(blockId, checked); settle(); }
     updateStats();
     cache.set('snapshot', { quests: state.quests, events: state.events, weeks: state.weeks, lastSync: state.lastSync });

@@ -981,6 +981,15 @@
     if (delta > 0 && date <= state.today) pointUp([{ stat, delta: 1, text: '' }]); // 누적은 오늘까지만 세므로, 앞날에 적은 건 그날이 돼야 오름
   }
 
+  async function relogin() {
+    if (relogin.busy) return;
+    relogin.busy = true;
+    toast('브라우저에서 노션 "허용"을 눌러 주세요…', 9000);
+    const r = await window.diary.notionLogin();
+    relogin.busy = false;
+    if (r.ok) { state.notionLogin = true; state.hasKeys.notion = true; toast('노션에 다시 연결했어요. 불러오는 중…'); }
+    else toast(r.message, 6000);
+  }
   function renderSync() {
     const el = $('#sync-status');
     const d = state.data;
@@ -992,7 +1001,14 @@
     else if (d.lastSync) { const t = new Date(d.lastSync); txt = `마지막 동기화 ${pad(t.getHours())}:${pad(t.getMinutes())}`; }
     el.textContent = txt.length > 70 ? txt.slice(0, 70) + '…' : txt;
     el.title = d.error || '';
-    $('#record-sync').textContent = d.lastSync ? `SYNC ${pad(new Date(d.lastSync).getHours())}:${pad(new Date(d.lastSync).getMinutes())}` : '';
+    // 기록 카드 아래 SYNC 글자: 노션 로그인이 풀리면 그 자리가 '다시 로그인' 버튼이 됨. 그 밖의 오류는 ⚠ 만 (자세한 건 마우스를 올리면)
+    const rs = $('#record-sync');
+    rs.classList.toggle('relogin', !!d.relogin);
+    rs.title = d.error || '';
+    if (d.relogin) { rs.textContent = '노션 다시 로그인 ↗'; rs.onclick = relogin; state.notionLogin = false; }
+    else { rs.onclick = null; rs.textContent = d.lastSync ? `SYNC ${pad(new Date(d.lastSync).getHours())}:${pad(new Date(d.lastSync).getMinutes())}${d.error ? ' ⚠' : ''}` : ''; }
+    if (d.relogin && !renderSync.told) toast('노션 로그인이 풀렸어요. 기록 카드 아래 "노션 다시 로그인"을 눌러 주세요.', 9000);
+    renderSync.told = !!d.relogin;
     $('#btn-pin').classList.toggle('on', !!state.settings.alwaysOnTop);
   }
 

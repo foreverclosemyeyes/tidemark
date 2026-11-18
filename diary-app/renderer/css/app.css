@@ -367,6 +367,7 @@ body.layout-bigcal #record::before { content: ''; position: absolute; inset: -6p
 /* ---------- 둥근 모양 → 각진 딱지 ---------- */
 body.layout-bigcal #record-sub:empty { display: none; }
 body.layout-bigcal #record-sync { white-space: nowrap; font-size: 10px; letter-spacing: .08em; font-weight: 800; opacity: .45; }
+#record-sync.relogin, body.layout-bigcal #record-sync.relogin { opacity: 1; color: #fff; background: var(--accent); padding: 3px 9px; letter-spacing: 0; cursor: pointer; white-space: nowrap; } /* 노션 로그인이 풀렸을 때 */
 /* ---------- 0/5 DONE: 스티커 느낌 ---------- */
 body.layout-bigcal #record-count .lbl:is(:empty) { display: none; }
 /* 0/5 의 사선 */
