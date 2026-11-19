@@ -269,7 +269,7 @@
   // '→' 를 누르면 뜨는 작은 메뉴: 내일 / 다음 주 월요일 / 날짜 고르기
   function moveMenu(anchor, item, row) {
     const old = $('.mv-menu'); if (old) old.remove();
-    const fromQuest = isQuestTodo(item);
+    const fromQuest = !!state.questView; // 업무 체크리스트의 항목 (노션 업무 페이지의 것이든 이 컴퓨터의 것이든)
     const base = parse(fromQuest ? state.today : state.selected);
     const next = new Date(base); do { next.setDate(next.getDate() + 1); } while (next.getDay() === 0 || next.getDay() === 6); // 다음 평일
     const mon = new Date(base); do { mon.setDate(mon.getDate() + 1); } while (mon.getDay() !== 1);
@@ -342,7 +342,7 @@
     row.append(ed);
     // 다른 날짜로 넘기기 (안 끝난 것만)
     if (!item.checked) {
-      const mv = h('button', 'todo-mv', '→'); mv.title = isQuestTodo(item) ? '날짜의 할 일로 보내기' : '다른 날짜로 넘기기';
+      const mv = h('button', 'todo-mv', '→'); mv.title = state.questView ? '날짜의 할 일로 보내기' : '다른 날짜로 넘기기';
       mv.onclick = (e) => { e.stopPropagation(); moveMenu(mv, item, row); };
       row.append(mv);
     }
@@ -365,7 +365,8 @@
   }
 
   // ---------- 업무별 체크리스트 ----------
-  // 진행 중 업무를 누르면 기록 카드가 그 업무의 체크리스트로 바뀜 (이 컴퓨터에만 저장). 날짜를 누르면 날짜 기록으로 돌아감
+  // 진행 중 업무를 누르면 기록 카드가 그 업무의 체크리스트로 바뀜. 날짜를 누르면 날짜 기록으로 돌아감.
+  // 노션 업무는 그 업무 페이지 안의 체크박스와 맞춰 쓰고(누를 때 읽어 옴), 노션 없이 만든 내 업무는 이 컴퓨터에만 저장
   const qKey = (q) => String(q.id).replace(/-/g, '');
   const questTodos = (q) => (state.data.questTodos || {})[qKey(q)] || [];
   const isQuestTodo = (item) => String(item.id).startsWith('qt-');
@@ -376,6 +377,7 @@
     $('#record').dataset.tab = 'log';
     renderAll();
     if (D.fx && !same) D.fx.swap('#record', 1);
+    window.diary.openQuest(q.id); // 노션 업무면 그 페이지의 체크리스트를 읽어 옴 (끝나면 화면이 다시 그려짐)
   }
   function closeQuest() { state.questView = null; renderAll(); if (D.fx) D.fx.swap('#record', -1); }
 
@@ -451,7 +453,10 @@
     else if (info && info.items.length) list.replaceChildren(...info.items.map(todoNode));
     else {
       list.innerHTML = '';
-      const msg = quest ? '이 업무에서 할 일을 아래 칸에 적어 보세요.\n(이 컴퓨터에만 저장돼요)' : state.data.local ? '아래 칸에 할 일을 적어 보세요.'
+      const qs = quest && (state.data.questState || {})[qKey(quest)]; // 노션 업무일 때만 있음
+      const msg = quest ? (qs && qs.error ? `⚠ ${qs.error}` : qs && qs.loading ? '노션에서 이 업무의 체크리스트를 불러오는 중…'
+        : `이 업무에서 할 일을 아래 칸에 적어 보세요.\n(${qs ? '노션의 이 업무 페이지에 체크리스트로 들어가요' : '이 컴퓨터에만 저장돼요'})`)
+        : state.data.local ? '아래 칸에 할 일을 적어 보세요.'
         : (sel.getDay() === 0 || sel.getDay() === 6) ? '주말이에요. 푹 쉬어요!' : '이 날짜의 체크리스트가 없어요.';
       const e = h('div', 'empty'); e.append(S('body', msg)); e.style.whiteSpace = 'pre-line';
       const skE = (state.theme.layout.skin || {}).empty;

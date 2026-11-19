@@ -20,7 +20,7 @@ const QT = require('./questTodos');
 const docsLib = require('./docs');
 const packLib = require('./pack');
 const updater = require('./updater');
-const { NotionMcp, RELOGIN, parseMarkdown, cleanText, escapeText, lastLine, markOf, locateMark } = require('./notionMcp');
+const { NotionMcp, RELOGIN, parseMarkdown, parseFlat, cleanText, escapeText, lastLine, markOf, locateMark } = require('./notionMcp');
 
 // ---------- 오류 기록 (문제가 생기면 원인을 알 수 있게) ----------
 let logFile = null;
@@ -83,7 +83,9 @@ function snapshot() {
   return {
     today: state.today,
     quests: (() => { const hid = new Set((store.get('settings', {}).hiddenQuests) || []); return state.quests.filter((q) => !hid.has(String(q.id).replace(/-/g, ''))); })(),
-    questTodos: store.get('questTodos', {}), // 업무별 체크리스트 (이 컴퓨터에만 저장)
+    // 업무별 체크리스트: 노션 업무는 그 페이지 안의 체크박스, 내 업무(노션 없이)는 이 컴퓨터에 저장한 것
+    questTodos: { ...store.get('questTodos', {}), ...Object.fromEntries([...questLists].map(([k, l]) => [k, l.items || []])) },
+    questState: Object.fromEntries([...questLists].map(([k, l]) => [k, { notion: true, loading: !!l.loading, error: l.error || null }])),
     events: state.events,
     weeks: state.weeks.map(({ days: _d, meta: _m, adders: _a, ...rest }) => rest),
     days,
@@ -117,6 +119,7 @@ function notionReady() {
 }
 const notConnected = () => (mcp && mcp.needsLogin() ? RELOGIN : '노션이 연결되지 않았어요.');
 function loadLocal() {
+  questLists.clear();
   Object.assign(state, {
     local: true, needsSetup: false, error: null, syncing: false, events: [],
     weeks: [{ id: LOCAL_WEEK, url: '', name: '내 체크리스트', start: '0000-01-01', end: '9999-12-31', days: store.get('localDays', {}) }],
@@ -210,6 +213,7 @@ async function doSync(force) {
     }
     state.weeks = weeks;
     applyPending();
+    await refreshQuestLists();
     state.lastSync = new Date().toISOString();
     state.error = null; state.relogin = false;
     updateStats();
@@ -264,9 +268,14 @@ function mcpWrite(pageId, pick) {
 function mcpReparse(pageId) {
   const cur = mcpPages.get(pageId);
   if (!cur) return;
-  const parsed = parseMarkdown(cur.md, pageId, cur.start);
+  const parsed = cur.kind === 'quest' ? parseFlat(cur.md, pageId) : parseMarkdown(cur.md, pageId, cur.start);
   for (const [id, a] of [...mcpAnchors]) if (a.pageId === pageId) mcpAnchors.delete(id);
   parsed.anchors.forEach((v, k) => mcpAnchors.set(k, v));
+  if (cur.kind === 'quest') { // 업무 페이지: 그 업무의 체크리스트
+    questLists.set(pageId, { ...questLists.get(pageId), items: parsed.items, adder: parsed.adder, lastEdited: cur.lastEdited, live: true, error: null });
+    applyPending(); saveQuestCache();
+    return;
+  }
   const w = state.weeks.find((x) => x.id === pageId);
   if (!w) return;
   w.days = parsed.days; w.adders = parsed.adders;
@@ -332,9 +341,11 @@ async function readViaMcp() {
       parsed.anchors.forEach((v, k) => anchors.set(k, v));
       weeks.push({ ...p, days: parsed.days, adders: parsed.adders });
     }
+    for (const [id, a] of mcpAnchors) if ((mcpPages.get(a.pageId) || {}).kind === 'quest') anchors.set(id, a); // 업무 페이지 것은 그대로
     mcpAnchors = anchors;
     state.weeks = weeks;
     applyPending();
+    await refreshQuestLists();
     state.lastSync = new Date().toISOString();
     state.error = null; state.relogin = false;
     updateStats();
@@ -490,26 +501,32 @@ function updateStats() {
 
 // ---------- 체크박스 → 노션 ----------
 const pendingTodos = new Map(); // blockId → checked (노션에 쓰는 중)
-function setLocalTodo(blockId, checked) {
-  const walk = (items) => {
-    for (const i of items || []) {
-      if (i.id === blockId) { i.checked = checked; return true; }
-      if (walk(i.children)) return true;
+const questLists = new Map(); // 업무 key → { items, live(이번에 읽었나), lastEdited, loading, error, adder | add }
+// 항목 하나를 id 로 찾음: 날짜 체크리스트(주간 페이지)와 업무 체크리스트(업무 페이지) 모두에서
+function findItem(id) {
+  const walk = (items, date) => {
+    for (let k = 0; k < (items || []).length; k++) {
+      if (items[k].id === id) return { item: items[k], list: items, index: k, date };
+      const hit = walk(items[k].children, date);
+      if (hit) return hit;
     }
-    return false;
+    return null;
   };
-  for (const w of state.weeks) for (const items of Object.values(w.days || {})) if (walk(items)) return true;
-  return false;
+  for (const w of state.weeks) for (const [date, items] of Object.entries(w.days || {})) { const hit = walk(items, date); if (hit) return hit; }
+  for (const l of questLists.values()) { const hit = walk(l.items, null); if (hit) return hit; }
+  return null;
+}
+function setLocalTodo(blockId, checked) {
+  const f = findItem(blockId);
+  if (f) f.item.checked = checked;
+  return !!f;
 }
 function applyPending() { rekeyPending(); for (const [id, c] of pendingTodos) setLocalTodo(id, c); }
 
 // ---------- 체크박스 지우기 ----------
 async function deleteTodo(id) {
   if (QT.isId(id)) return questTodo((all) => QT.remove(all, id)) ? { ok: true } : gone;
-  const removeLocal = () => {
-    const walk = (items) => { const k = (items || []).findIndex((x) => x.id === id); if (k >= 0) { items.splice(k, 1); return true; } return (items || []).some((x) => walk(x.children)); };
-    for (const w of state.weeks) for (const items of Object.values(w.days || {})) if (walk(items)) return;
-  };
+  const removeLocal = () => { const f = findItem(id); if (f) f.list.splice(f.index, 1); };
   if (offline()) { removeLocal(); saveLocal(); pushData(); return { ok: true }; }
   try {
     const token = secrets.get('notion');
@@ -534,11 +551,7 @@ async function editTodo(id, text) {
   text = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
   if (!text) return { ok: false, message: '내용을 적어 주세요.' };
   if (QT.isId(id)) return questTodo((all) => QT.edit(all, id, text)) ? { ok: true } : gone;
-  const setLocal = () => {
-    const walk = (items) => (items || []).some((x) => (x.id === id ? ((x.text = text), true) : walk(x.children)));
-    for (const w of state.weeks) for (const items of Object.values(w.days || {})) if (walk(items)) return true;
-    return false;
-  };
+  const setLocal = () => { const f = findItem(id); if (f) f.item.text = text; return !!f; };
   if (offline()) { setLocal(); saveLocal(); pushData(); return { ok: true }; }
   try {
     const token = secrets.get('notion');
@@ -575,9 +588,8 @@ async function moveTodo(id, toDate) {
     questTodo((all) => QT.remove(all, id));
     return { ok: true, count: 1, created: r.created };
   }
-  let found = null, fromDate = null;
-  const walk = (items, date) => { for (const x of items || []) { if (x.id === id) { found = x; fromDate = date; return true; } if (walk(x.children, date)) return true; } return false; };
-  for (const w of state.weeks) { for (const [date, items] of Object.entries(w.days || {})) if (walk(items, date)) break; if (found) break; }
+  const hit = findItem(id); // 날짜의 항목이든 업무 페이지의 항목이든
+  const found = hit && hit.item, fromDate = hit && hit.date;
   if (!found) return { ok: false, message: '항목을 못 찾았어요. 새로고침 후 다시 해 주세요.' };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(toDate) || toDate === fromDate) return { ok: false, message: '넘길 날짜를 다시 골라 주세요.' };
   const under = (x) => (x.children || []).filter((c) => !c.checked).flatMap((c) => [c.text, ...under(c)]); // 하위의 하위까지
@@ -654,15 +666,127 @@ function removeQuest(id) {
   return { ok: true };
 }
 
-// ---------- 업무별 체크리스트 (이 컴퓨터에만 저장) ----------
+// ---------- 업무별 체크리스트 ----------
+// 노션 업무는 그 업무 페이지 안의 체크박스와 맞춰 쓴다 (읽기·추가·체크·고치기·지우기 모두 그 페이지에).
+// 노션 없이 만든 내 업무는 이 컴퓨터에만 저장한다 (questTodo, id 가 'qt-' 로 시작).
 function questTodo(change) {
   const all = store.get('questTodos', {});
   const out = change(all);
   if (out) { store.set('questTodos', all); pushData(); }
   return out;
 }
-const addQuestTodo = (questId, text) => (questTodo((all) => QT.add(all, questId, text)) ? { ok: true } : { ok: false, message: '내용을 적어 주세요.' });
 const gone = { ok: false, message: '항목을 못 찾았어요.' };
+const questOf = (key) => state.quests.find((q) => QT.keyOf(q.id) === key) || null;
+const questIsNotion = (q) => !!(q && q.url) && !offline() && (secrets.has('notion') || !!(mcp && mcp.loggedIn()));
+const saveQuestCache = () => cache.set('questItems', Object.fromEntries([...questLists].map(([k, l]) => [k, l.items || []])));
+
+// 업무 페이지를 읽어 체크리스트를 채움. (노션 로그인 쪽은 mcpSerial 줄 안에서 불러야 함)
+async function readQuest(key) {
+  const q = questOf(key);
+  if (!q) return;
+  const token = secrets.get('notion');
+  if (!token) {
+    mcpPages.set(key, { md: await mcp.fetchPage(key), kind: 'quest', lastEdited: q.lastEdited });
+    mcpReparse(key);
+    return;
+  }
+  // API 키 쪽: 페이지 안의 체크박스 블록을 위에서부터 (상자·칼럼 안도). 새 항목은 마지막 체크박스 바로 뒤에 넣음
+  const tree = await new notion.NotionClient(token).getBlockTree(q.id);
+  const items = []; let add = { parentId: q.id };
+  const walk = (blocks, parentId) => {
+    for (const b of blocks || []) {
+      if (b.type !== 'to_do') { walk(b.children, b.id); continue; }
+      const item = notion.parseTodo(b);
+      if (item) items.push(item);
+      add = { parentId, afterId: b.id };
+    }
+  };
+  walk(tree, q.id);
+  questLists.set(key, { ...questLists.get(key), items, add, lastEdited: q.lastEdited, live: true, error: null });
+  saveQuestCache();
+}
+// 업무 페이지에 체크박스 하나 추가 (readQuest 로 읽어 둔 뒤, 같은 줄 안에서)
+async function writeQuestTodo(key, text, checked = false) {
+  const l = questLists.get(key);
+  const token = secrets.get('notion');
+  if (token) {
+    const client = new notion.NotionClient(token);
+    const res = await client.addTodo(l.add.parentId, l.add.afterId, text);
+    const made = res && res.results && res.results[0];
+    if (checked && made) await client.setTodo(made.id, true);
+    await readQuest(key);
+    return;
+  }
+  const line = `- [${checked ? 'x' : ' '}] ${escapeText(text)}`;
+  if (l.adder) { // 마지막 체크박스 바로 뒤에
+    const neu = `${l.adder.old}\n${l.adder.indent}${line}`;
+    await mcp.replaceText(key, l.adder.old, neu);
+    const cur = mcpPages.get(key);
+    cur.md = cur.md.replace(l.adder.old, () => neu);
+    mcpReparse(key);
+  } else { // 체크박스가 아직 없는 페이지: 맨 끝에 덧붙이고 다시 읽음
+    await mcp.call('notion-update-page', { page_id: key, command: 'insert_content', content: line, position: { type: 'end' }, allow_async: false });
+    await readQuest(key);
+  }
+}
+// 읽고 쓰는 묶음을 차례에 맞춰 실행 (노션 로그인 쪽은 다른 읽기·쓰기와 한 줄로)
+const questJob = (fn) => (secrets.get('notion') ? fn() : mcpSerial(fn));
+const questLoads = new Map(); // 같은 업무를 동시에 두 번 읽지 않게
+function loadQuest(key) {
+  if (!questLoads.has(key)) {
+    questLoads.set(key, questJob(async () => {
+      await readQuest(key);
+      // 예전에 이 컴퓨터에만 적어 둔 항목이 있으면 노션 페이지로 옮김 (옮긴 것부터 하나씩 지움)
+      const all = store.get('questTodos', {});
+      for (const it of [...(all[key] || [])]) {
+        await writeQuestTodo(key, it.text, it.checked);
+        QT.remove(all, it.id); store.set('questTodos', all);
+      }
+    }).finally(() => questLoads.delete(key)));
+  }
+  return questLoads.get(key);
+}
+// 업무를 눌러 체크리스트를 열 때: 노션 업무면 그 페이지를 읽어 옴
+async function openQuest(questId) {
+  const key = QT.keyOf(questId), q = questOf(key);
+  if (!questIsNotion(q)) return { ok: true };
+  questLists.set(key, { items: [], ...questLists.get(key), loading: true, error: null });
+  pushData();
+  try { await loadQuest(key); } catch (e) {
+    console.error('[quest open]', e);
+    questLists.set(key, { items: [], ...questLists.get(key), error: e.friendly || '노션에서 이 업무 페이지를 불러오지 못했어요.' });
+  }
+  const l = questLists.get(key); if (l) l.loading = false;
+  pushData();
+  return { ok: true };
+}
+// 동기화 때: 열어 본 업무 중 노션에서 바뀐 것만 다시 읽고, 끝난(목록에서 빠진) 업무는 정리
+async function refreshQuestLists() {
+  for (const [key, l] of [...questLists]) {
+    const q = questOf(key);
+    if (!q) { questLists.delete(key); mcpPages.delete(key); for (const [id, a] of [...mcpAnchors]) if (a.pageId === key) mcpAnchors.delete(id); continue; }
+    if (l.live && l.lastEdited === q.lastEdited) continue;
+    try { await readQuest(key); } catch (e) { console.error('[quest refresh]', e); }
+  }
+  saveQuestCache();
+}
+async function addQuestTodo(questId, text) {
+  text = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!text) return { ok: false, message: '내용을 적어 주세요.' };
+  const key = QT.keyOf(questId);
+  if (!questIsNotion(questOf(key))) return questTodo((all) => QT.add(all, key, text)) ? { ok: true } : { ok: false, message: '내용을 적어 주세요.' };
+  try {
+    await questJob(async () => {
+      if (!(questLists.get(key) || {}).live) await readQuest(key);
+      await writeQuestTodo(key, text);
+    });
+    pushData();
+    return { ok: true, notion: true };
+  } catch (e) {
+    console.error('[quest todo]', e);
+    return { ok: false, message: e.friendly || '노션의 업무 페이지에 추가하지 못했어요.' };
+  }
+}
 
 // ---------- 새 체크박스 추가 ----------
 async function addTodo(date, text) {
@@ -1006,7 +1130,7 @@ function registerIpc() {
     try { await mcp.login(); sync(true); return { ok: true, loggedIn: true }; }
     catch (e) { log('notion login', e); return { ok: false, message: e.friendly || '노션 로그인에 실패했어요. 다시 해 주세요.' }; }
   });
-  ipcMain.handle('notion:logout', () => { mcp.logout(); mcpPages.clear(); mcpAnchors = new Map(); state.weeks = []; state.quests = []; state.events = []; sync(true); return { loggedIn: false }; });
+  ipcMain.handle('notion:logout', () => { mcp.logout(); mcpPages.clear(); mcpAnchors = new Map(); questLists.clear(); state.weeks = []; state.quests = []; state.events = []; sync(true); return { loggedIn: false }; });
   ipcMain.handle('update:install', () => installUpdate());
   ipcMain.handle('log:show', () => { if (logFile) shell.showItemInFolder(logFile); return !!logFile; });
   ipcMain.handle('assistant:ask', () => runAssistant({ notify: false }));
@@ -1051,6 +1175,7 @@ function registerIpc() {
   ipcMain.handle('quest:add', (_e, name, end) => addQuest(name, end));
   ipcMain.handle('quest:remove', (_e, id) => removeQuest(String(id)));
   ipcMain.handle('quest:todo:add', (_e, questId, text) => addQuestTodo(String(questId), String(text)));
+  ipcMain.handle('quest:open', (_e, questId) => openQuest(String(questId)));
   ipcMain.handle('todo:delete', (_e, id) => deleteTodo(String(id)));
   ipcMain.handle('todo:add', (_e, date, text) => addTodo(String(date), String(text)));
   ipcMain.handle('todo:move', (_e, id, date) => moveTodo(String(id), String(date)));
@@ -1185,6 +1310,7 @@ app.whenReady().then(() => {
   applyAppIcon();
 
   // 지난번 동기화 결과로 먼저 화면을 채움 (인터넷이 없어도 보임)
+  for (const [k, items] of Object.entries(cache.get('questItems', {}))) questLists.set(k, { items });
   const snap = cache.get('snapshot');
   if (snap) { state.quests = snap.quests || []; state.events = snap.events || []; state.weeks = snap.weeks || []; state.lastSync = snap.lastSync; }
 

@@ -135,6 +135,34 @@ console.log('✓ 노션 로그인(MCP) 마크다운 파싱 테스트 통과');
   console.log('✓ 번호가 밀려도 같은 줄 찾기 테스트 통과');
 }
 
+// 업무 페이지의 체크리스트: 날짜 구역 없이 페이지 안의 체크박스 전부. 같은 글의 줄이 여럿이어도 바꿀 글은 페이지에서 딱 한 번만 나옴
+{
+  const { parseFlat } = require('../main/notionMcp');
+  const page = ['## 메모', '설명', '- [ ] 확인', '중간 글', '- [x] 확인', '\t- [ ] 하위 7\\~9', '- [ ] 확인 완료', '```', '- [ ] 코드 안의 것은 아님', '```', '', '<database url="x">표</database>'].join('\n');
+  const r = parseFlat(page, 'Q');
+  assert.deepStrictEqual(r.items.map((x) => [x.text, x.checked, x.children.map((c) => c.text)]), [['확인', false, []], ['확인', true, ['하위 7~9']], ['확인 완료', false, []]]);
+  for (const a of r.anchors.values()) {
+    assert.strictEqual(page.split(a.oldStr).length - 1, 1, `바꿀 글이 한 번만: ${a.oldStr}`);
+    assert.strictEqual(page.split(a.delOld).length - 1, 1, `지울 글이 한 번만: ${a.delOld}`);
+  }
+  const ids = r.items.map((x) => x.id);
+  // 첫 '확인' 줄은 '확인 완료'의 앞부분과 겹치므로 윗줄을 끼워서 구분함
+  assert.strictEqual(r.anchors.get(ids[0]).oldStr, '설명\n- [ ] 확인');
+  assert.ok(page.replace(r.anchors.get(ids[0]).oldStr, () => r.anchors.get(ids[0]).newStr).includes('설명\n- [x] 확인\n중간 글\n- [x] 확인'));
+  // 지우기: 하위 항목까지, 둘레 글은 그대로
+  const del = r.anchors.get(ids[1]);
+  assert.strictEqual(page.replace(del.delOld, () => del.delNew), page.replace('- [x] 확인\n\t- [ ] 하위 7\\~9\n', ''));
+  // 새 항목 자리: 마지막 체크박스 뒤, 들여쓰기는 그 묶음의 가장 바깥 것
+  assert.deepStrictEqual(r.adder, { old: '- [ ] 확인 완료', indent: '' });
+  assert.deepStrictEqual(parseFlat('<callout>\n\t안내\n\t- [ ] 가\n\t\t- [ ] 가의 하위\n</callout>', 'Q').adder, { old: '\t\t- [ ] 가의 하위', indent: '\t' });
+  assert.strictEqual(parseFlat('글만 있는 페이지', 'Q').adder, null);
+  assert.deepStrictEqual(parseFlat('', 'Q'), { items: [], anchors: new Map(), adder: null });
+  // 페이지의 첫 줄이 체크박스일 때 지우기
+  const top = parseFlat('- [ ] 맨 위\n아래 글', 'Q').anchors.get('Q:q:1');
+  assert.strictEqual('- [ ] 맨 위\n아래 글'.replace(top.delOld, () => top.delNew), '아래 글');
+  console.log('✓ 업무 페이지 체크리스트 파싱 테스트 통과');
+}
+
 // 노션 로그인 유지: 갱신 요청이 겹쳐도 한 번만 나가고, 로그인이 풀리면 조용히 사라지지 않고 표시가 남음
 (async () => {
   const { NotionMcp, refreshOnce } = require('../main/notionMcp');

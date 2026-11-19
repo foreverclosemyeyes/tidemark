@@ -372,6 +372,7 @@ function shiftISO(iso, days) {
 
 module.exports = {
   NotionClient,
+  parseTodo,
   NotionError,
   parseChecklist,
   countItems,

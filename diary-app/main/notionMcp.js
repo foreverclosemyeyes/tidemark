@@ -297,6 +297,56 @@ function parseMarkdown(md, pageId, startISO) {
   return { days, anchors, adders };
 }
 
+// ---------- 업무 페이지의 체크리스트 ----------
+// 업무(태스크) 페이지에는 날짜 구역이 없다 → 페이지 안의 체크박스를 위에서부터 전부 모은다 (들여쓴 것은 하위 항목).
+// 바꿀 글(old_str)은 그 줄에서 시작해, 페이지에서 딱 한 번만 나올 때까지 위 줄을 덧붙여 만든다 (같은 글의 줄이 여럿이어도 안전).
+// 돌려주는 것: { items, anchors, adder }  adder = 새 체크박스를 붙일 자리 { old: 마지막 체크박스까지의 글, indent: 새 줄의 들여쓰기 }.
+// 체크박스가 하나도 없으면 null (그때는 페이지 끝에 덧붙임)
+function parseFlat(md, pageId) {
+  const lines = String(md || '').split('\n');
+  const times = (str) => md.split(str).length - 1;
+  const block = (from, to) => { // from 줄에서 위로 넓혀 가며 한 번만 나오는 덩어리
+    let start = from, str = lines.slice(start, to + 1).join('\n');
+    while (start > 0 && times(str) > 1) { start--; str = lines.slice(start, to + 1).join('\n'); }
+    return { start, str };
+  };
+  const items = [], anchors = new Map();
+  let stack = [], n = 0, tail = -1, fenced = false; // tail = 마지막 체크박스 줄 (빈 체크박스 포함, 코드 상자 안은 제외)
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*```/.test(lines[i])) { fenced = !fenced; continue; }
+    const tm = !fenced && lines[i].match(TODO_RE);
+    if (!tm) continue;
+    tail = i;
+    const indent = tm[1].replace(/\t/g, '  ').length;
+    while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+    const text = cleanText(tm[3]);
+    if (!text) continue; // 빈 체크박스는 숨김
+    const id = `${pageId}:q:${++n}`;
+    const item = { id, text, checked: tm[2] !== ' ', children: [] };
+    const one = block(i, i);
+    const toggled = lines[i].replace(/- \[( |x|X)\]/, tm[2] === ' ' ? '- [x]' : '- [ ]');
+    // 지우기: 하위 체크박스 줄까지. 지운 자리에 남길 글이 있도록 가능하면 바로 윗줄(없으면 아랫줄)을 끼워서 바꾼다
+    let endL = i;
+    for (let k = i + 1; k < lines.length; k++) {
+      const m2 = lines[k].match(/^(\s*)- \[/);
+      if (m2 && m2[1].replace(/\t/g, '  ').length > indent) endL = k; else break;
+    }
+    let delOld, delNew;
+    if (i > 0) { const d = block(i - 1, endL); delOld = d.str; delNew = lines.slice(d.start, i).join('\n'); }
+    else if (endL + 1 < lines.length) { delOld = lines.slice(0, endL + 2).join('\n'); delNew = lines[endL + 1]; }
+    else { delOld = lines.slice(0, endL + 1).join('\n'); delNew = ''; }
+    anchors.set(id, { id, pageId, line: i, oldStr: one.str, newStr: one.str.slice(0, one.str.length - lines[i].length) + toggled, delOld, delNew });
+    if (stack.length) stack[stack.length - 1].item.children.push(item); else items.push(item);
+    stack.push({ indent, item });
+  }
+  // 새 체크박스 자리: 마지막 체크박스 줄(빈 체크박스 포함)의 바로 뒤.
+  // 들여쓰기는 그 체크박스 묶음에서 가장 바깥 것에 맞춤 (하위 항목 뒤에 붙여도 하위로 들어가지 않고, 같은 상자 안에 머물게)
+  if (tail < 0) return { items, anchors, adder: null };
+  let indent = lines[tail].match(/^\s*/)[0];
+  for (let k = tail - 1; k >= 0 && TODO_RE.test(lines[k]); k--) { const ws = lines[k].match(/^\s*/)[0]; if (ws.length < indent.length) indent = ws; }
+  return { items, anchors, adder: { old: block(tail, tail).str, indent } };
+}
+
 // ---------- 바꿀 줄 다시 찾기 ----------
 // 항목 id 는 '그 날짜의 몇 번째'라서, 위 항목이 지워지면 번호가 밀린다. 누른 순간의 그 줄을 기억해 두었다가(markOf)
 // 실제로 쓸 차례가 왔을 때 같은 줄을 다시 찾는다(locateMark). 못 찾거나 같은 줄이 여럿이면 엉뚱한 줄을 건드리지 않고 그만둔다.
@@ -314,4 +364,4 @@ function locateMark(anchors, mark) {
   throw Object.assign(new Error('anchor moved'), { friendly: '그 사이 내용이 바뀌었어요. 다시 해 주세요.' });
 }
 
-module.exports = { NotionMcp, refreshOnce, RELOGIN, parseMarkdown, cleanText, escapeText, lastLine, markOf, locateMark, REDIRECT };
+module.exports = { NotionMcp, refreshOnce, RELOGIN, parseMarkdown, parseFlat, cleanText, escapeText, lastLine, markOf, locateMark, REDIRECT };
