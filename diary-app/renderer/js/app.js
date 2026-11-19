@@ -778,18 +778,20 @@
     svg.append(svgEl('polygon', { points: P(starPts(44, 18.5)), class: 'pu-ring r1' }), svgEl('polygon', { points: P(starPts(36, 15)), class: 'pu-ring r2' }));
     // 가운데 금색 별: 면을 번갈아 밝고 어둡게
     const gold = svgEl('g', { class: 'pu-gold' });
-    const faces = Array.from({ length: 10 }, (_, k) => gold.appendChild(svgEl('polygon', { class: k % 2 ? 'f1' : 'f2' })));
-    // 능력치만큼 꼭짓점이 뻗은 별. 오르기 전 모양에서 시작해서, 음표가 꽂힐 때마다 오른 능력치의 꼭짓점이 뻗어 나감.
-    // 1점에 실제로 느는 길이는 눈에 안 보일 만큼 작아서(0.3쯤) 이 화면에서는 보이게 크게 내민다
+    const mk = (n, cls) => Array.from({ length: n }, (_, k) => gold.appendChild(svgEl('polygon', { class: cls(k) })));
+    const faces = mk(10, (k) => (k % 2 ? 'f1' : 'f2'));
+    const glow = mk(10, (k) => (k % 2 ? 'g1' : 'g2')); // 가운데에서 번지는 밝은 별 (마지막 음표 뒤)
+    const rivets = Array.from({ length: 20 }, () => gold.appendChild(svgEl('circle', { class: 'rv', r: 0.75 })));
+    // 능력치만큼 꼭짓점이 뻗은 별. 오르기 전 모양에서 시작해서, 음표가 꽂히면 오른 능력치의 꼭짓점이 조금 더 나감.
+    // (1점에 실제로 느는 길이는 눈에 안 보일 만큼 작아서 이 화면에서는 보이게 내민다)
     const gained = {}; for (const c of ups) gained[c.stat] = (gained[c.stat] || 0) + (c.delta || 1);
     const was = Object.fromEntries(STATS.map((st) => [st, Math.max(0, (totals[st] || 0) - (gained[st] || 0))]));
-    // 새로 자란 부분은 하얗게: 원래 끝(tip0)에서 새 끝까지의 화살촉 모양. 글자가 걷힐 때 금색으로 스며듦
-    const tip0 = statStarPts(was, 0, 0, 18, 44, 0.42);
-    const fresh = STATS.map((st) => (gained[st] ? gold.appendChild(svgEl('polygon', { class: 'nw' })) : null));
     const drawGold = (out) => {
       const gp = statStarPts(was, 0, 0, 18, 44, 0.42, STATS.map((st) => (gained[st] ? out : 0)));
       faces.forEach((f, k) => f.setAttribute('points', P([[0, 0], gp[k], gp[(k + 1) % 10]])));
-      fresh.forEach((f, i) => f && f.setAttribute('points', P([gp[(2 * i + 9) % 10], gp[2 * i], gp[2 * i + 1], tip0[2 * i]])));
+      glow.forEach((f, k) => f.setAttribute('points', P([[0, 0], gp[k].map((v) => v * 0.5), gp[(k + 1) % 10].map((v) => v * 0.5)])));
+      // 모서리를 따라 박힌 작은 점 (모서리마다 둘, 살짝 안쪽)
+      rivets.forEach((c, n) => { const a = gp[n >> 1], z = gp[((n >> 1) + 1) % 10], t = n % 2 ? 0.68 : 0.32; c.setAttribute('cx', ((a[0] + (z[0] - a[0]) * t) * 0.9).toFixed(1)); c.setAttribute('cy', ((a[1] + (z[1] - a[1]) * t) * 0.9).toFixed(1)); });
     };
     drawGold(0);
     svg.append(gold);
@@ -816,7 +818,6 @@
     });
     // 음표들이 화면 밖에서 크게 날아와 별 가운데에 납작하게 꽂힘 (첫 음표가 닿는 순간 별이 금색으로)
     const notes = noteCount(ups);
-    svg.style.setProperty('--hits', notes);
     [[-120, 70, -28], [-115, -45, 22], [25, -125, -10]].slice(0, notes).forEach(([x, y, r], k) => {
       const n = noteSvg('pu-note');
       [['--x', x + 'vh'], ['--y', y + 'vh'], ['--r', r + 'deg'], ['--d', 400 + k * 170 + 'ms']].forEach(([prop, v]) => n.style.setProperty(prop, v));
@@ -844,21 +845,30 @@
     const at = (ms, cls) => timers.push(setTimeout(() => box.classList.add(cls), ms));
     void box.offsetWidth; // 처음 상태를 한 번 그린 뒤에 시작
     box.classList.add('in');
-    const t = 1380 + (notes - 1) * 170; // 마지막 음표가 꽂히고 꼭짓점이 뻗는 게 보인 뒤에 글자가 나옴
-    at(780, 'gold'); at(t, 't1'); at(t + 230, 't2'); at(t + 500, 't3'); at(t + 2050, 'tout');
-    // 꼭짓점 뻗기: 음표가 꽂힐 때마다 한 칸씩, 용수철처럼 넘쳤다가 자리 잡음
-    const reach = 8 + notes * 3;
-    let out = 0, vel = 0, goal = 0, last = 0, raf = 0;
+    // 흐름(참고 영상): 첫 음표가 닿으며 금색 별이 생김 → 음표가 꽂힐 때마다 별 전체가 한 단계씩 크게 부풂
+    // → 마지막 음표 뒤에 탁 제 크기로 돌아옴 → 가운데에서 밝은 빛이 번짐 → 글자(흰색 → 노랑)
+    const HIT = 920, GAP = 170, lastHit = HIT + (notes - 1) * GAP;
+    const settle = lastHit + 240, t = settle + 300;
+    at(HIT - 60, 'gold'); at(settle + 140, 'gleam'); at(t, 't1'); at(t + 230, 't2'); at(t + 500, 't3'); at(t + 2050, 'tout');
+    // 용수철 둘: size = 별 전체 크기, out = 오른 능력치 꼭짓점이 더 나간 길이
+    const sp = { size: { x: 0, v: 0, goal: 0, k: 0.22, d: 0.66 }, out: { x: 0, v: 0, goal: 0, k: 0.16, d: 0.78 } };
+    let last = 0, raf = 0;
     const spring = (now) => {
       let n = Math.max(1, Math.min(6, Math.round((now - last) / 16.7))); last = now;
-      while (n--) { vel = (vel + (goal - out) * 0.16) * 0.78; out += vel; }
-      drawGold(out);
-      raf = box.isConnected && (Math.abs(vel) > 0.01 || Math.abs(goal - out) > 0.01) ? requestAnimationFrame(spring) : 0;
+      let moving = false;
+      while (n--) for (const q of Object.values(sp)) { q.v = (q.v + (q.goal - q.x) * q.k) * q.d; q.x += q.v; }
+      for (const q of Object.values(sp)) if (Math.abs(q.v) > 0.002 || Math.abs(q.goal - q.x) > 0.002) moving = true;
+      gold.style.scale = Math.max(0, sp.size.x).toFixed(3);
+      drawGold(sp.out.x);
+      raf = box.isConnected && moving ? requestAnimationFrame(spring) : 0;
     };
-    for (let k = 0; k < notes; k++) timers.push(setTimeout(() => {
-      goal = (reach * (k + 1)) / notes; vel += 2.4;
-      if (!raf) { last = performance.now(); raf = requestAnimationFrame(spring); }
-    }, 860 + k * 170));
+    const kick = (ms, fn) => timers.push(setTimeout(() => { fn(); if (!raf) { last = performance.now(); raf = requestAnimationFrame(spring); } }, ms));
+    kick(HIT - 60, () => { sp.size.goal = 1; });
+    for (let k = 0; k < notes; k++) kick(HIT + k * GAP, () => {
+      sp.size.goal = 1 + (0.32 + 0.1 * notes) * ((k + 1) / notes); // 음표 1개 1.42배, 3개면 1.2 → 1.4 → 1.62배
+      sp.out.goal = ((4 + notes * 2) * (k + 1)) / notes; sp.out.v += 1.6;
+    });
+    kick(settle, () => { sp.size.goal = 1; });
     timers.push(setTimeout(close, t + 2950));
   }
 
