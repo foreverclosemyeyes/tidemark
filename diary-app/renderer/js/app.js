@@ -131,7 +131,9 @@
     const [y, m] = state.viewMonth.split('-').map(Number);
     const sel = parse(state.selected);
     $('#bc-month-label').replaceChildren(S('calHead', MON_EN[m - 1]), S('body', ` ${y}`, 'bc-year'));
-    $('#bc-tag').replaceChildren(S('body', `${sel.getMonth() + 1}/${sel.getDate()} (${WD[sel.getDay()]})${state.selected === state.today ? '  TODAY' : ''}`));
+    const vq = viewedQuest(); // 업무 체크리스트를 보는 중이면 날짜 대신 업무 이름
+    $('#bc-tag').replaceChildren(S('body', vq ? vq.name : `${sel.getMonth() + 1}/${sel.getDate()} (${WD[sel.getDay()]})${state.selected === state.today ? '  TODAY' : ''}`));
+    $('#bc-tag').title = vq ? vq.name : '';
 
     const head = $('#bc-head'); head.innerHTML = '';
     const grid = $('#bc-grid'); grid.innerHTML = '';
@@ -267,7 +269,8 @@
   // '→' 를 누르면 뜨는 작은 메뉴: 내일 / 다음 주 월요일 / 날짜 고르기
   function moveMenu(anchor, item, row) {
     const old = $('.mv-menu'); if (old) old.remove();
-    const base = parse(state.selected);
+    const fromQuest = isQuestTodo(item);
+    const base = parse(fromQuest ? state.today : state.selected);
     const next = new Date(base); do { next.setDate(next.getDate() + 1); } while (next.getDay() === 0 || next.getDay() === 6); // 다음 평일
     const mon = new Date(base); do { mon.setDate(mon.getDate() + 1); } while (mon.getDay() !== 1);
     const label = (d) => `${d.getMonth() + 1}/${d.getDate()} (${WD[d.getDay()]})`;
@@ -279,10 +282,12 @@
       toast(r.ok ? `${label(parse(date))}로 넘겼어요.${r.created ? ` 노션에 "${r.created}" 페이지를 새로 만들었어요.` : ''}` : r.message, r.ok ? (r.created ? 5000 : 2500) : 6000);
     };
     const opt = (text, date) => { const b = h('button', null, text); b.onclick = (e) => { e.stopPropagation(); go(date); }; return b; };
-    menu.append(h('b', null, '언제로 넘길까요?'), opt(`다음 날  ${label(next)}`, iso(next)));
+    menu.append(h('b', null, fromQuest ? '어느 날의 할 일로 보낼까요?' : '언제로 넘길까요?'));
+    if (fromQuest) menu.append(opt(`오늘  ${label(base)}`, iso(base)));
+    menu.append(opt(`다음 날  ${label(next)}`, iso(next)));
     if (iso(mon) !== iso(next)) menu.append(opt(`다음 주 월요일  ${label(mon)}`, iso(mon)));
     const pick = h('input'); pick.type = 'date';
-    pick.min = iso(new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1));
+    pick.min = iso(new Date(base.getFullYear(), base.getMonth(), base.getDate() + (fromQuest ? 0 : 1)));
     pick.max = iso(new Date(base.getFullYear() + 2, base.getMonth(), base.getDate()));
     pick.onclick = (e) => e.stopPropagation();
     // 연도를 한 자씩 치는 동안에도 change 가 오므로(0002년 …) 범위 안의 날짜일 때만 넘김
@@ -301,10 +306,11 @@
     row.append(h('span', 'box', item.checked ? '✓' : ''));
     row.append(S('checklist', item.text, 'txt'));
     row.querySelector('.txt').title = item.text;
-    const del = h('button', 'todo-del', '×'); del.title = '이 체크리스트 지우기 (노션에서도 지워져요)';
+    const own = isQuestTodo(item) || state.data.local; // 이 컴퓨터에만 있는 항목
+    const del = h('button', 'todo-del', '×'); del.title = own ? '이 항목 지우기' : '이 체크리스트 지우기 (노션에서도 지워져요)';
     del.onclick = async (e) => {
       e.stopPropagation();
-      if (!confirm(`"${item.text}"${item.children && item.children.length ? ' (하위 항목 포함)' : ''}을(를) 지울까요?\n노션에서도 지워져요.`)) return;
+      if (!confirm(`"${item.text}"${item.children && item.children.length ? ' (하위 항목 포함)' : ''}을(를) 지울까요?${own ? '' : '\n노션에서도 지워져요.'}`)) return;
       row.classList.add('busy');
       const r = await window.diary.deleteTodo(item.id);
       if (!r.ok) { row.classList.remove('busy'); toast(r.message, 5000); }
@@ -336,12 +342,12 @@
     row.append(ed);
     // 다른 날짜로 넘기기 (안 끝난 것만)
     if (!item.checked) {
-      const mv = h('button', 'todo-mv', '→'); mv.title = '다른 날짜로 넘기기';
+      const mv = h('button', 'todo-mv', '→'); mv.title = isQuestTodo(item) ? '날짜의 할 일로 보내기' : '다른 날짜로 넘기기';
       mv.onclick = (e) => { e.stopPropagation(); moveMenu(mv, item, row); };
       row.append(mv);
     }
     row.append(del);
-    row.title = item.checked ? '눌러서 체크 풀기 (노션에도 반영)' : '눌러서 완료 체크 (노션에도 반영)';
+    row.title = item.checked ? `눌러서 체크 풀기${own ? '' : ' (노션에도 반영)'}` : `눌러서 완료 체크${own ? '' : ' (노션에도 반영)'}`;
     row.onclick = async () => {
       if (!item.checked && D.fx) D.fx.burst(row.querySelector('.box'));
       row.classList.add('busy');
@@ -358,26 +364,49 @@
     return wrap;
   }
 
-  let stampDay = null; // 도장을 마지막으로 그린 날짜
+  // ---------- 업무별 체크리스트 ----------
+  // 진행 중 업무를 누르면 기록 카드가 그 업무의 체크리스트로 바뀜 (이 컴퓨터에만 저장). 날짜를 누르면 날짜 기록으로 돌아감
+  const qKey = (q) => String(q.id).replace(/-/g, '');
+  const questTodos = (q) => (state.data.questTodos || {})[qKey(q)] || [];
+  const isQuestTodo = (item) => String(item.id).startsWith('qt-');
+  function viewedQuest() { return state.questView ? visibleQuests().find((q) => qKey(q) === state.questView) || null : null; }
+  function openQuest(q) {
+    const same = state.questView === qKey(q);
+    state.questView = qKey(q);
+    $('#record').dataset.tab = 'log';
+    renderAll();
+    if (D.fx && !same) D.fx.swap('#record', 1);
+  }
+  function closeQuest() { state.questView = null; renderAll(); if (D.fx) D.fx.swap('#record', -1); }
+
+  let stampDay = null; // 도장을 마지막으로 그린 날짜(또는 업무)
   function renderRecord() {
     const sel = parse(state.selected);
     const isToday = state.selected === state.today;
-    const titleEl = S('section', isToday ? '오늘의 기록' : '그날의 기록'); // 날짜는 오른쪽 위 날짜표에만
+    const quest = viewedQuest();
+    if (!quest) state.questView = null; // 보던 업무가 끝났거나 숨겨짐
+    $('#record').classList.toggle('quest-view', !!quest);
+    const titleEl = S('section', quest ? '업무 기록' : isToday ? '오늘의 기록' : '그날의 기록'); // 날짜는 오른쪽 위 날짜표에만
     // 레퍼런스의 'Daily Log' 처럼 한 글자에 회색 블록
     if (!state.theme.text.section.perChar) {
       const t = titleEl.textContent, k = t.lastIndexOf('기');
       if (k >= 0) { titleEl.textContent = t.slice(0, k); const b = h('span', 'tl-box', '기'); titleEl.append(b, document.createTextNode(t.slice(k + 1))); }
     }
     $('#record-title').replaceChildren(titleEl);
-    const info = dayInfo(state.selected);
-    $('#record-sub').replaceChildren();
+    const info = quest ? { items: questTodos(quest), url: quest.url } : dayInfo(state.selected);
+    const sub = $('#record-sub'); sub.replaceChildren();
+    if (quest) {
+      const back = h('button', 'q-back', '← 날짜 기록'); back.onclick = closeQuest;
+      const d = dday(quest);
+      sub.append(back, h('span', 'q-view-name', quest.name), h('span', 'q-view-due', quest.end ? `마감 ${quest.end.slice(5).replace('-', '/')} · ${d === 0 ? 'D-DAY' : d > 0 ? `D-${d}` : `D+${-d}`}` : '마감일 없음'));
+    }
     const c = count(info && info.items);
     const rc = $('#record-count'); rc.innerHTML = '';
     if (c.total) {
       if (c.done < c.total) rc.append(h('span', 'prog', `${c.done}/${c.total}`));
     }
     const evBox = $('#record-events'); evBox.innerHTML = '';
-    for (const e of eventsOn(state.selected)) {
+    for (const e of quest ? [] : eventsOn(state.selected)) {
       const chip = h('button', 'ev-chip' + (isMeet(e) ? ' meet' : ''), `${e.name}${e.start !== e.end ? ` ${e.start.slice(5).replace('-', '/')}–${e.end.slice(5).replace('-', '/')}` : ''}`);
       chip.title = '노션에서 열기';
       chip.onclick = () => window.diary.open(e.url);
@@ -397,8 +426,8 @@
         const d = dday(q);
         const row = h('div', 'rq-row' + (d !== null && d <= 3 ? ' soon' : '') + (d !== null && d < 0 ? ' over' : ''));
         row.append(h('span', 'rq-name', q.name), h('span', 'rq-dd', d === null ? '—' : d === 0 ? 'D-DAY' : d > 0 ? `D-${d}` : `D+${-d}`));
-        row.title = '노션에서 열기';
-        row.onclick = () => window.diary.open(q.url);
+        row.title = '눌러서 이 업무의 체크리스트 보기';
+        row.onclick = () => openQuest(q);
         box.append(row);
       }
     }
@@ -406,7 +435,8 @@
     // 다른 날로 넘어가서 이미 다 끝난 날을 볼 때는 넘어오는 움직임 하나만 나오게 도장은 조용히 보여 줌
     const stamp = $('#record-stamp');
     const allDone = c.total > 0 && c.done === c.total;
-    const sameDay = stampDay === state.selected; stampDay = state.selected;
+    const view = state.questView || state.selected;
+    const sameDay = stampDay === view; stampDay = view;
     if (allDone) {
       const slam = stamp.hidden && sameDay;
       stamp.replaceChildren(S('stamp', state.theme.layout.stampText || 'DONE!!'));
@@ -421,7 +451,7 @@
     else if (info && info.items.length) list.replaceChildren(...info.items.map(todoNode));
     else {
       list.innerHTML = '';
-      const msg = state.data.local ? '아래 칸에 할 일을 적어 보세요.'
+      const msg = quest ? '이 업무에서 할 일을 아래 칸에 적어 보세요.\n(이 컴퓨터에만 저장돼요)' : state.data.local ? '아래 칸에 할 일을 적어 보세요.'
         : (sel.getDay() === 0 || sel.getDay() === 6) ? '주말이에요. 푹 쉬어요!' : '이 날짜의 체크리스트가 없어요.';
       const e = h('div', 'empty'); e.append(S('body', msg)); e.style.whiteSpace = 'pre-line';
       const skE = (state.theme.layout.skin || {}).empty;
@@ -429,7 +459,7 @@
       list.append(e);
     }
     const btn = $('#btn-open-notion');
-    btn.hidden = !!state.data.local; // 노션 없이 쓸 때는 열 페이지가 없음
+    btn.hidden = quest ? !quest.url : !!state.data.local; // 열 노션 페이지가 없으면 숨김
     btn.disabled = !info;
     btn.onclick = () => info && window.diary.open(info.url);
     $('#btn-today').hidden = isToday && state.viewMonth === state.today.slice(0, 7);
@@ -482,13 +512,16 @@
     }
     for (const q of quests) {
       const d = dday(q);
-      const row = h('div', 'quest' + (d !== null && d <= 3 ? ' soon' : '') + (d !== null && d < 0 ? ' over' : ''));
+      const row = h('div', 'quest' + (d !== null && d <= 3 ? ' soon' : '') + (d !== null && d < 0 ? ' over' : '') + (state.questView === qKey(q) ? ' cur' : ''));
       row.append(S('quest', q.name));
       const meta = h('div', 'meta');
       meta.append(h('span', 'st', q.status || ''), h('span', null, q.end ? `마감 ${q.end.slice(5).replace('-', '/')}` : '마감일 없음'));
+      const tc = count(questTodos(q)); // 이 업무의 체크리스트 진행
+      if (tc.total) meta.append(h('span', 'q-prog' + (tc.done === tc.total ? ' all' : ''), `☑ ${tc.done}/${tc.total}`));
       row.append(meta);
       row.append(h('div', 'dd', d === null ? '—' : d === 0 ? 'D-DAY' : d > 0 ? `D-${d}` : `D+${-d}`));
-      if (q.url) { row.title = '노션에서 열기'; row.onclick = () => window.diary.open(q.url); }
+      row.title = '눌러서 이 업무의 체크리스트 보기';
+      row.onclick = () => openQuest(q);
       const x = h('button', 'q-hide', '×'); x.title = q.url ? '이 업무 숨기기 (휴지통에 있는 업무 등)' : '이 업무 지우기';
       x.onclick = async (e) => { e.stopPropagation(); if (q.url) hideQuest(q); else { await window.diary.removeQuest(q.id); toast(`"${q.name}" 지웠어요.`); } };
       row.append(x);
@@ -1048,6 +1081,7 @@
 
   function select(date) {
     const prev = state.selected;
+    state.questView = null;
     state.selected = date;
     if (date.slice(0, 7) !== state.viewMonth) state.viewMonth = date.slice(0, 7);
     window.diary.setView({ selected: date, month: state.viewMonth });
@@ -1138,7 +1172,7 @@
       const inp = $('#todo-add-input');
       const text = inp.value.trim(); if (!text) return;
       inp.disabled = true;
-      const r = await window.diary.addTodo(state.selected, text);
+      const r = state.questView ? await window.diary.addQuestTodo(state.questView, text) : await window.diary.addTodo(state.selected, text);
       inp.disabled = false;
       if (r.ok) { inp.value = ''; inp.focus(); if (r.created) toast(`노션에 "${r.created}" 페이지를 새로 만들었어요. (상태: 시작 전)`, 5000); } else toast(r.message, 5000);
     };

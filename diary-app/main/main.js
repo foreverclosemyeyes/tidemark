@@ -16,6 +16,7 @@ const notion = require('./notion');
 const assistant = require('./assistant');
 const statsAuto = require('./stats');
 const weekly = require('./weekly');
+const QT = require('./questTodos');
 const docsLib = require('./docs');
 const packLib = require('./pack');
 const updater = require('./updater');
@@ -82,6 +83,7 @@ function snapshot() {
   return {
     today: state.today,
     quests: (() => { const hid = new Set((store.get('settings', {}).hiddenQuests) || []); return state.quests.filter((q) => !hid.has(String(q.id).replace(/-/g, ''))); })(),
+    questTodos: store.get('questTodos', {}), // 업무별 체크리스트 (이 컴퓨터에만 저장)
     events: state.events,
     weeks: state.weeks.map(({ days: _d, meta: _m, adders: _a, ...rest }) => rest),
     days,
@@ -503,6 +505,7 @@ function applyPending() { rekeyPending(); for (const [id, c] of pendingTodos) se
 
 // ---------- 체크박스 지우기 ----------
 async function deleteTodo(id) {
+  if (QT.isId(id)) return questTodo((all) => QT.remove(all, id)) ? { ok: true } : gone;
   const removeLocal = () => {
     const walk = (items) => { const k = (items || []).findIndex((x) => x.id === id); if (k >= 0) { items.splice(k, 1); return true; } return (items || []).some((x) => walk(x.children)); };
     for (const w of state.weeks) for (const items of Object.values(w.days || {})) if (walk(items)) return;
@@ -530,6 +533,7 @@ async function deleteTodo(id) {
 async function editTodo(id, text) {
   text = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
   if (!text) return { ok: false, message: '내용을 적어 주세요.' };
+  if (QT.isId(id)) return questTodo((all) => QT.edit(all, id, text)) ? { ok: true } : gone;
   const setLocal = () => {
     const walk = (items) => (items || []).some((x) => (x.id === id ? ((x.text = text), true) : walk(x.children)));
     for (const w of state.weeks) for (const items of Object.values(w.days || {})) if (walk(items)) return true;
@@ -562,6 +566,15 @@ async function editTodo(id, text) {
 // ---------- 체크리스트를 다른 날짜로 넘기기 ----------
 // 넘길 날짜에 먼저 적고(하위 항목 중 안 끝난 것도 같이), 다 적힌 뒤에 원래 것을 지움 → 중간에 실패해도 사라지지 않음
 async function moveTodo(id, toDate) {
+  if (QT.isId(id)) { // 업무 체크리스트의 항목을 그 날짜의 할 일로 보냄: 먼저 적고, 적힌 뒤에 뺌
+    const f = QT.locate(store.get('questTodos', {}), id);
+    if (!f) return gone;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(toDate)) return { ok: false, message: '넘길 날짜를 다시 골라 주세요.' };
+    const r = await addTodo(toDate, f.item.text);
+    if (!r.ok) return r;
+    questTodo((all) => QT.remove(all, id));
+    return { ok: true, count: 1, created: r.created };
+  }
   let found = null, fromDate = null;
   const walk = (items, date) => { for (const x of items || []) { if (x.id === id) { found = x; fromDate = date; return true; } if (walk(x.children, date)) return true; } return false; };
   for (const w of state.weeks) { for (const [date, items] of Object.entries(w.days || {})) if (walk(items, date)) break; if (found) break; }
@@ -636,9 +649,20 @@ async function addQuest(name, end) {
 function removeQuest(id) {
   if (!offline()) return { ok: false, message: '노션에 있는 업무는 노션에서 지워 주세요. (× 는 이 앱에서만 숨겨요)' };
   state.quests = state.quests.filter((q) => q.id !== id);
+  questTodo((all) => { QT.drop(all, id); return true; });
   saveLocal(); pushData();
   return { ok: true };
 }
+
+// ---------- 업무별 체크리스트 (이 컴퓨터에만 저장) ----------
+function questTodo(change) {
+  const all = store.get('questTodos', {});
+  const out = change(all);
+  if (out) { store.set('questTodos', all); pushData(); }
+  return out;
+}
+const addQuestTodo = (questId, text) => (questTodo((all) => QT.add(all, questId, text)) ? { ok: true } : { ok: false, message: '내용을 적어 주세요.' });
+const gone = { ok: false, message: '항목을 못 찾았어요.' };
 
 // ---------- 새 체크박스 추가 ----------
 async function addTodo(date, text) {
@@ -700,6 +724,7 @@ async function addTodo(date, text) {
 }
 
 async function toggleTodo(blockId, checked) {
+  if (QT.isId(blockId)) return questTodo((all) => QT.toggle(all, blockId, checked)) ? { ok: true } : gone;
   setLocalTodo(blockId, checked);
   pendingTodos.set(blockId, checked);
   pushData();
@@ -1025,6 +1050,7 @@ function registerIpc() {
   ipcMain.handle('chat:clear', () => { store.set('chat', []); push('chat', []); return []; });
   ipcMain.handle('quest:add', (_e, name, end) => addQuest(name, end));
   ipcMain.handle('quest:remove', (_e, id) => removeQuest(String(id)));
+  ipcMain.handle('quest:todo:add', (_e, questId, text) => addQuestTodo(String(questId), String(text)));
   ipcMain.handle('todo:delete', (_e, id) => deleteTodo(String(id)));
   ipcMain.handle('todo:add', (_e, date, text) => addTodo(String(date), String(text)));
   ipcMain.handle('todo:move', (_e, id, date) => moveTodo(String(id), String(date)));

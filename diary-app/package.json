@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node test/parse.test.js && node test/mcp-parse.test.js && node test/gmail.test.js && node test/weekly.test.js && node test/docs.test.js && node test/pack.test.js",
+    "test": "node test/parse.test.js && node test/mcp-parse.test.js && node test/gmail.test.js && node test/weekly.test.js && node test/docs.test.js && node test/pack.test.js && node test/quest-todos.test.js",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win"
   },

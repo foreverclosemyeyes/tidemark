@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('diary', {
   editTodo: (id, text) => ipcRenderer.invoke('todo:edit', id, text),
   addQuest: (name, end) => ipcRenderer.invoke('quest:add', name, end),
   removeQuest: (id) => ipcRenderer.invoke('quest:remove', id),
+  addQuestTodo: (questId, text) => ipcRenderer.invoke('quest:todo:add', questId, text),
   saveTheme: (t) => ipcRenderer.invoke('theme:save', t),
   saveStats: (s) => ipcRenderer.invoke('stats:save', s),
   resetStats: () => ipcRenderer.invoke('stats:reset'),

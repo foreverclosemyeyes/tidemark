@@ -101,6 +101,17 @@ body.settings-open #app { margin-right: 0 !important; }
 .q-hide:hover { background: var(--accent); }
 .q-add { flex: none; align-self: center; border: 0; background: #0b0b0b; color: #fff; width: 22px; height: 20px; padding: 0; font: 800 15px/20px "Nanum Gothic", sans-serif; clip-path: polygon(12% 0, 100% 0, 88% 100%, 0 100%); cursor: pointer; }
 .q-add:hover { background: var(--accent); }
+/* 업무별 체크리스트: 기록 카드가 그 업무의 목록으로 바뀜 */
+#record.quest-view #record-sub, body.layout-bigcal #record.quest-view #record-sub { display: flex; align-items: center; gap: 8px; margin-top: 6px; min-width: 0; }
+.q-back { flex: none; border: 0; background: #0b0b0b; color: #fff; padding: 2px 9px; font: 800 11px "Nanum Gothic", sans-serif; cursor: pointer; clip-path: polygon(0 0, 100% 0, 94% 100%, 0 100%); }
+.q-back:hover { background: var(--accent); }
+.q-view-name { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+body.layout-bigcal .q-view-name { display: none; } /* 큰 달력 배치에서는 날짜표 자리에 이름이 나옴 */
+.q-view-due { flex: none; font-size: 11px; opacity: .7; white-space: nowrap; }
+body.layout-bigcal #record.quest-view #bc-tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--accent); }
+.quest .q-prog { font-weight: 800; }
+.quest .q-prog.all { color: var(--accent); }
+.quest.cur { background: color-mix(in srgb, var(--card-text-solid) 10%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
 .q-form { display: flex; gap: 6px; padding: 4px 2px 8px; border-bottom: 1px solid color-mix(in srgb, var(--card-text-solid) 18%, transparent); }
 .q-form input { border: 0; border-bottom: 1.5px solid #0b0b0b55; background: transparent; color: var(--card-text); font: 700 13px "Nanum Gothic", sans-serif; outline: none; padding: 3px 2px; min-width: 0; }
 .q-form input[type="text"] { flex: 1; }
