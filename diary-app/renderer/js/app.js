@@ -869,24 +869,33 @@
     void box.offsetWidth; // 처음 상태를 한 번 그린 뒤에 시작
     box.classList.add('in');
     // 금색 별: 첫 음표가 닿는 순간 생겨서 세 번에 걸쳐 조금씩 커졌다가(올라갈랑) 잠깐 버틴 뒤 툭 제 크기로(말랑)
-    const T = PU.HIT, t = T + 580;
+    const swell = swellOf(notes);
+    const T = PU.HIT, t = T + swell.ms + 180; // 별이 제 크기로 돌아오고 0.18초 뒤에 글자
     timers.push(setTimeout(() => {
-      gold.animate(PU.SWELL.map(([ms, sc]) => ({ scale: String(sc), offset: ms / PU.SWELL_MS })), { duration: PU.SWELL_MS, fill: 'forwards' });
+      gold.animate(swell.keys.map(([ms, sc]) => ({ scale: String(sc), offset: ms / swell.ms })), { duration: swell.ms, fill: 'forwards' });
     }, T));
-    at(T, 'gold'); at(T + 480, 'gleam'); at(t, 't1'); at(t + 130, 't2'); at(t + 400, 't3'); at(t + 2050, 'tout');
+    at(T, 'gold'); at(T + swell.ms + 80, 'gleam'); at(t, 't1'); at(t + 130, 't2'); at(t + 400, 't3'); at(t + 2050, 'tout');
     timers.push(setTimeout(close, t + 2950));
   }
 
   // 포인트업 별 화면의 박자. 참고 영상 두 개를 한 프레임(1/30초)씩 재서 얻은 값.
-  // SWELL: 금색 별이 생긴 뒤의 [지난 시간 ms, 크기 배율]. 0.6 → 0.93 → 1.12 로 튀어나와서, 1.19, 1.25 로 한 칸씩 더 밀고
-  //        (바깥 고리 쪽으로 넘어갈 듯) 0.14초쯤 버티다가 두 프레임 만에 제 크기 1.0 으로 떨어진다.
+  // 금색 별은 0.61 → 0.93 → 1.12 로 튀어나온 뒤, 음표가 더 꽂힐 때마다 1.19, 1.25 로 한 칸씩 더 밀고
+  // (바깥 고리 쪽으로 넘어갈 듯) 0.14초쯤 버티다가 두 프레임 만에 제 크기 1.0 으로 떨어진다. 영상은 음표 3개(세 칸)짜리.
   const PU = {
     HIT: 920,               // 화면이 뜬 뒤 첫 음표가 별 가운데에 닿는 때
     FLY: 520,               // 음표가 날아오는 시간 (CSS puNote 의 길이)
-    BEATS: [0, 130, 200],   // 음표가 닿는 박자 = 별이 한 칸씩 커지는 때
-    SWELL: [[0, 0], [33, 0.61], [67, 0.93], [100, 1.12], [133, 1.19], [167, 1.19], [200, 1.25], [340, 1.25], [367, 1.15], [400, 1]],
-    SWELL_MS: 400,
+    BEATS: [0, 130, 200],   // 음표가 닿는 박자
+    POP: [[0, 0], [33, 0.61], [67, 0.93], [100, 1.12]], // 첫 음표: 생기면서 첫 칸까지 [ms, 크기]
+    STEPS: [[[133, 1.19]], [[167, 1.19], [200, 1.25]]], // 둘째·셋째 음표가 미는 칸 (셋째는 잠깐 멈칫했다가)
+    HOLD: 140,              // 마지막 칸에서 버티는 시간
   };
+  // 음표 수만큼만 올라감: 음표 1개면 첫 칸(1.12)까지만 갔다가 떨어짐
+  function swellOf(notes) {
+    const keys = [...PU.POP, ...PU.STEPS.slice(0, Math.max(0, notes - 1)).flat()];
+    const [at, top] = keys[keys.length - 1];
+    keys.push([at + PU.HOLD, top], [at + PU.HOLD + 27, 1 + (top - 1) * 0.6], [at + PU.HOLD + 60, 1]);
+    return { keys, ms: at + PU.HOLD + 60 };
+  }
 
   let introUps = null; // 음표 앞머리가 도는 동안 들어온 포인트업을 모아 뒀다가 한 번에 보여 줌
   function pointUp(ups, afterIntro) {
