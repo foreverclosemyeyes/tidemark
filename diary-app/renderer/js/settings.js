@@ -228,6 +228,7 @@
       btn('지금 확인', '', async () => { await window.diary.checkUpdate(); render(); }),
       ...(u.available ? [btn(`v${u.latest} 로 업데이트`, 'primary', () => document.getElementById('btn-update').click())] : []),
       linkBtn('열쇠 만들기 페이지 ↗', 'https://github.com/settings/personal-access-tokens/new'),
+      btn('문제 기록 파일 보기', '', () => window.diary.showLog()),
     );
     up.body.append(note('새 버전이 있으면 위쪽에 <b>UPDATE</b> 버튼이 떠요. 누르면 받아서 바꿔 끼우고 다시 켜져요. 앱은 <b>응용 프로그램 폴더</b>에 있어야 해요.'));
     const g = C.section('일반', true);

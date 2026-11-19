@@ -983,6 +983,7 @@ function registerIpc() {
   });
   ipcMain.handle('notion:logout', () => { mcp.logout(); mcpPages.clear(); mcpAnchors = new Map(); state.weeks = []; state.quests = []; state.events = []; sync(true); return { loggedIn: false }; });
   ipcMain.handle('update:install', () => installUpdate());
+  ipcMain.handle('log:show', () => { if (logFile) shell.showItemInFolder(logFile); return !!logFile; });
   ipcMain.handle('assistant:ask', () => runAssistant({ notify: false }));
   ipcMain.handle('assistant:chat', (_e, text) => chatWithAssistant(text));
   // Gmail 연결 확인: 되면 찾은 커넥터 이름을 기억해 둠
@@ -1131,8 +1132,16 @@ app.whenReady().then(() => {
   cache = new JsonStore(path.join(ud, 'notion-cache.json'));
   if (!store.get('notionCfg', null) && ((cache.get('snapshot', null) || {}).weeks || []).some((w) => w && w.url)) store.set('notionCfg', LEGACY_CFG);
   secrets = new Secrets(path.join(ud, 'secrets.json'));
+  secrets.onError = (name, e) => log('secret unreadable', name, String((e && e.message) || e));
   mcp = new NotionMcp({
-    load: () => { try { return JSON.parse(secrets.get('notionMcp') || '{}'); } catch { return {}; } },
+    log,
+    load: () => {
+      try {
+        const raw = secrets.get('notionMcp');
+        // 저장은 돼 있는데 못 푼 경우(키체인 거부): 로그인이 없는 게 아니라 '풀린 상태'로 봐서 다시 로그인을 안내
+        return raw ? JSON.parse(raw) : (secrets.unreadable.has('notionMcp') ? { expired: true } : {});
+      } catch { return {}; }
+    },
     save: (o) => secrets.set('notionMcp', JSON.stringify(o || {})),
     open: (url) => shell.openExternal(url),
   });

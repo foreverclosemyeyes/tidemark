@@ -146,7 +146,8 @@ console.log('✓ 노션 로그인(MCP) 마크다운 파싱 테스트 통과');
     return tok === 'R1' ? new Response(JSON.stringify({ access_token: 'A2', refresh_token: 'R2' }), { status: 200, headers: { 'content-type': 'application/json' } })
       : new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400, headers: { 'content-type': 'application/json' } });
   };
-  const f = refreshOnce(server);
+  const notes = [];
+  const f = refreshOnce(server, (...x) => notes.push(x.join(' ')));
   const req = (tok) => f('https://x/token', { method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tok }) });
   const [a, b] = await Promise.all([req('R1'), req('R1')]);           // 겹친 갱신 둘
   assert.strictEqual(sent, 1, '같은 토큰의 갱신은 한 번만 보냄');
@@ -157,6 +158,8 @@ console.log('✓ 노션 로그인(MCP) 마크다운 파싱 테스트 통과');
   assert.strictEqual((await req('OLD')).status, 400); assert.strictEqual((await req('OLD')).status, 400);
   assert.strictEqual(sent, 3, '실패한 답은 들고 있지 않음');
   await f('https://x/other', { method: 'POST', body: 'a=1' }); assert.strictEqual(sent, 4, '갱신이 아닌 요청은 그대로');
+  assert.deepStrictEqual(notes, ['notion token refresh 200 ', 'notion token refresh 400 invalid_grant', 'notion token refresh 400 invalid_grant'], '갱신 결과가 기록에 남음 (토큰 값 없이)');
+  assert.ok(!notes.join().includes('R1') && !notes.join().includes('A2'));
 
   let saved = { tokens: { access_token: 'A', refresh_token: 'R' }, client: { client_id: 'c' } }; const opened = [];
   const m = new NotionMcp({ load: () => ({ ...saved }), save: (o) => { saved = o; }, open: (u) => opened.push(u) });

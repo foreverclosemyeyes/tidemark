@@ -16,7 +16,7 @@ const REDIRECT = `http://127.0.0.1:${PORT}/callback`;
 // 노션은 갱신용 토큰(refresh_token)을 한 번 쓰면 새 것으로 바꿔 준다. 접속이 여럿(요청 + 알림 스트림)이라
 // 토큰이 만료되는 순간 갱신 요청이 둘 나갈 수 있는데, 둘째는 '이미 쓴 토큰'이라 거절되고(invalid_grant)
 // 그러면 로그인 자체가 지워진다. → 같은 토큰으로 하는 갱신은 한 번만 보내고, 그 답을 같이 쓴다.
-function refreshOnce(baseFetch) {
+function refreshOnce(baseFetch, note = () => {}) {
   const seen = new Map(); // refresh_token → 진행 중이거나 방금 끝난 갱신
   return async (url, init) => {
     const body = init && init.body;
@@ -27,6 +27,8 @@ function refreshOnce(baseFetch) {
       const job = baseFetch(url, init).then(async (res) => ({ status: res.status, type: res.headers.get('content-type') || 'application/json', body: await res.text() }));
       seen.set(key, job);
       // 성공한 답은 잠시 들고 있음 (조금 늦게 온 같은 요청에도 같은 새 토큰을 줌). 실패는 바로 잊음
+      // 기록: 언제 갱신했고 됐는지, 안 됐으면 노션이 댄 이유 (토큰 값은 남기지 않음)
+      job.then((r) => { let why = ''; if (r.status >= 400) { try { why = JSON.parse(r.body).error || ''; } catch { /* 글 답 */ } } note('notion token refresh', r.status, why); }, (e) => note('notion token refresh failed', String((e && e.message) || e)));
       job.then((r) => { if (r.status >= 400) seen.delete(key); else { const t = setTimeout(() => seen.delete(key), 5 * 60 * 1000); if (t.unref) t.unref(); } }, () => seen.delete(key));
     }
     const r = await seen.get(key);
@@ -43,7 +45,8 @@ class NotionMcp {
     this.tools = null;
     this.verifier = null;
     this.loggingIn = false;
-    this.fetch = refreshOnce(io.fetch || ((...a) => fetch(...a)));
+    this.note = io.log || (() => {});
+    this.fetch = refreshOnce(io.fetch || ((...a) => fetch(...a)), this.note);
     const self = this;
     this.provider = {
       get redirectUrl() { return REDIRECT; },
@@ -66,6 +69,7 @@ class NotionMcp {
       codeVerifier: () => self.verifier,
       invalidateCredentials: (scope) => {
         const d = self.io.load();
+        self.note('notion credentials invalidated', scope, d.tokens ? 'had tokens' : 'no tokens', self.loggingIn ? 'during login' : '');
         if (scope === 'all' || scope === 'client') delete d.client;
         if (scope === 'all' || scope === 'tokens') {
           if (d.tokens && !self.loggingIn) d.expired = true; // 쓰던 로그인이 풀림 → '다시 로그인' 안내용 표시

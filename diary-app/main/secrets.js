@@ -6,6 +6,8 @@ const { safeStorage } = require('electron');
 class Secrets {
   constructor(file) {
     this.file = file;
+    this.unreadable = new Set(); // 저장돼 있는데 풀지 못한 것 (맥 키체인 접근이 거부된 경우 등)
+    this.onError = null;
     try { this.data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { this.data = {}; }
   }
   has(name) { return !!this.data[name]; }
@@ -14,10 +16,16 @@ class Secrets {
     if (!v) return '';
     try {
       const buf = Buffer.from(v.value, 'base64');
-      return v.encrypted ? safeStorage.decryptString(buf) : buf.toString('utf8');
-    } catch { return ''; }
+      const out = v.encrypted ? safeStorage.decryptString(buf) : buf.toString('utf8');
+      this.unreadable.delete(name);
+      return out;
+    } catch (e) {
+      if (!this.unreadable.has(name)) { this.unreadable.add(name); if (this.onError) this.onError(name, e); }
+      return '';
+    }
   }
   set(name, value) {
+    this.unreadable.delete(name);
     if (!value) { delete this.data[name]; }
     else {
       const enc = safeStorage.isEncryptionAvailable();
