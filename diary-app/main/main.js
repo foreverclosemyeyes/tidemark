@@ -1164,13 +1164,20 @@ app.whenReady().then(() => {
     load: () => {
       try {
         const raw = secrets.get('notionMcp');
-        // 저장은 돼 있는데 못 푼 경우(키체인 거부): 로그인이 없는 게 아니라 '풀린 상태'로 봐서 다시 로그인을 안내
-        return raw ? JSON.parse(raw) : (secrets.unreadable.has('notionMcp') ? { expired: true } : {});
+        if (raw) return JSON.parse(raw);
+        // 저장은 돼 있는데 못 푼 경우(키체인 거부): 로그인돼 있던 것이면 '풀린 상태'로 봐서 다시 로그인을 안내.
+        // 로그아웃했거나 로그인한 적이 없으면 그냥 없는 것 (노션 없이 쓰기를 가리지 않게)
+        return secrets.unreadable.has('notionMcp') && store.get('notionSignedIn') ? { expired: true } : {};
       } catch { return {}; }
     },
-    save: (o) => secrets.set('notionMcp', JSON.stringify(o || {})),
+    save: (o) => {
+      const keep = o && Object.keys(o).length;
+      secrets.set('notionMcp', keep ? JSON.stringify(o) : ''); // 남길 게 없으면 지움
+      store.set('notionSignedIn', !!(o && o.tokens));          // 로그인 여부만 따로 적어 둠 (비밀 아님)
+    },
     open: (url) => shell.openExternal(url),
   });
+  if (store.get('notionSignedIn') === undefined && mcp.loggedIn()) store.set('notionSignedIn', true); // 이 표시가 생기기 전에 로그인한 경우
   // 개발 실행에서만: 가짜 노션을 붙여 쓰기 흐름(연달아 누르기 등)을 시험할 때 씀
   if (!app.isPackaged && process.env.DIARY_FAKE_MCP) mcp = require(process.env.DIARY_FAKE_MCP);
   assetsDir = path.join(ud, 'assets');
