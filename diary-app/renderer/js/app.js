@@ -808,15 +808,15 @@
     const svg = svgEl('svg', { viewBox: '-100 -100 200 200', class: 'pu-star' });
     const P = (pts) => pts.map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' ');
     svg.append(svgEl('polygon', { points: P(starPts(98, 50)), class: 'pu-big' }));
-    svg.append(svgEl('polygon', { points: P(starPts(44, 18.5)), class: 'pu-ring r1' }), svgEl('polygon', { points: P(starPts(36, 15)), class: 'pu-ring r2' }));
-    // 가운데 금색 별: 면을 번갈아 밝고 어둡게
+    // 금색 별 둘레의 겹겹 띠 (검정·회색 번갈아). 참고 영상을 재 보면 띠의 경계가 금색 별 크기의 1.54 / 1.26 / 1 / 0.71 / 0.42 배.
+    // 금색 별은 제 크기에서 안쪽 띠를 딱 덮고, 커질 때 바로 바깥 회색 띠를 채워 나간다 (1.26배면 다 채움)
+    const U = PU.GOLD, LEAN = 0.42; // 꼭짓점 길이, 안쪽 꼭짓점 비율
+    [[1.54, 'k'], [1.26, 'g'], [1, 'k'], [0.71, 'g'], [0.42, 'k']].forEach(([m, tone]) => svg.append(svgEl('polygon', { points: P(starPts(U * m, U * m * LEAN)), class: 'pu-band ' + tone })));
+    // 가운데 금색 별: 영상처럼 반듯한 별. 면을 번갈아 밝고 어둡게, 그 위에 가운데에서 번지는 밝은 별
     const gold = svgEl('g', { class: 'pu-gold' });
-    const gp = statStarPts(totals, 0, 0, 18, 44, 0.42); // 능력치만큼 꼭짓점이 뻗은 별
+    const gp = starPts(U, U * LEAN);
     gp.forEach((pt, k) => gold.append(svgEl('polygon', { points: P([[0, 0], pt, gp[(k + 1) % 10]]), class: k % 2 ? 'f1' : 'f2' })));
-    // 가운데에서 번지는 밝은 별 (제 크기로 돌아온 뒤)
     gp.forEach((pt, k) => gold.append(svgEl('polygon', { points: P([[0, 0], pt.map((v) => v * 0.5), gp[(k + 1) % 10].map((v) => v * 0.5)]), class: k % 2 ? 'g1' : 'g2' })));
-    // 모서리를 따라 박힌 작은 점 (모서리마다 둘, 살짝 안쪽)
-    gp.forEach((pt, k) => { const z = gp[(k + 1) % 10]; for (const t of [0.32, 0.68]) gold.append(svgEl('circle', { class: 'rv', r: 0.75, cx: ((pt[0] + (z[0] - pt[0]) * t) * 0.9).toFixed(1), cy: ((pt[1] + (z[1] - pt[1]) * t) * 0.9).toFixed(1) })); });
     svg.append(gold);
     // 큰 별 다섯 끝의 어두운 그림: 안경(지식) · 번개(배짱) · 톱니(손재주) · 하트(친절) · 반짝임(매력)
     const ICONS = [
@@ -882,8 +882,9 @@
   // 금색 별은 0.61 → 0.93 → 1.12 로 튀어나온 뒤, 음표가 더 꽂힐 때마다 1.19, 1.25 로 한 칸씩 더 밀고
   // (바깥 고리 쪽으로 넘어갈 듯) 0.14초쯤 버티다가 두 프레임 만에 제 크기 1.0 으로 떨어진다. 영상은 음표 3개(세 칸)짜리.
   const PU = {
-    HIT: 920,               // 화면이 뜬 뒤 첫 음표가 별 가운데에 닿는 때
-    FLY: 520,               // 음표가 날아오는 시간 (CSS puNote 의 길이)
+    GOLD: 34,               // 금색 별의 꼭짓점 길이 (화면 별 그림은 -100~100)
+    HIT: 775,               // 화면이 뜬 뒤 첫 음표가 별 가운데에 닿는 때 (이때 금색 별이 생김)
+    FLY: 375,               // 음표가 출발해서 가운데에 닿기까지 (CSS puNote 0.52초의 72% 지점. 그 뒤는 납작하게 눌리는 구간)
     BEATS: [0, 130, 200],   // 음표가 닿는 박자
     POP: [[0, 0], [33, 0.61], [67, 0.93], [100, 1.12]], // 첫 음표: 생기면서 첫 칸까지 [ms, 크기]
     STEPS: [[[133, 1.19]], [[167, 1.19], [200, 1.25]]], // 둘째·셋째 음표가 미는 칸 (셋째는 잠깐 멈칫했다가)
