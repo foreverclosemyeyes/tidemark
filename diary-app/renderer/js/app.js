@@ -816,7 +816,7 @@
     // 금색 별 둘레의 겹겹 띠 (검정·회색 번갈아). 참고 영상을 재 보면 띠의 경계가 금색 별 크기의 1.54 / 1.26 / 1 / 0.71 / 0.42 배.
     // 금색 별은 제 크기에서 안쪽 띠를 딱 덮고, 커질 때 바로 바깥 회색 띠를 채워 나간다 (1.26배면 다 채움)
     const U = PU.GOLD, LEAN = 0.42; // 꼭짓점 길이, 안쪽 꼭짓점 비율
-    [[1.54, 'k'], [1.26, 'g'], [1, 'k'], [0.71, 'g'], [0.42, 'k']].forEach(([m, tone]) => svg.append(svgEl('polygon', { points: P(starPts(U * m, U * m * LEAN)), class: 'pu-band ' + tone })));
+    [[1.54, 'k'], [1.26, 'g'], [1, 'k'], [0.71, 'g'], [0.42, 'k']].forEach(([m, tone]) => svg.append(svgEl('polygon', { points: P(starPts(U * m, U * m * LEAN)), class: 'pu-tier ' + tone })));
     // 가운데 금색 별: 영상처럼 반듯한 별. 면을 번갈아 밝고 어둡게, 그 위에 가운데에서 번지는 밝은 별
     const gold = svgEl('g', { class: 'pu-gold' });
     const gp = starPts(U, U * LEAN);

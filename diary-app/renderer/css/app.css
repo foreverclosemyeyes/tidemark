@@ -823,8 +823,9 @@ body.layout-bigcal .prank { font-size: 13px; letter-spacing: .02em; color: #0b0b
 .pu-star { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; scale: .2; opacity: 0; transition: scale .34s .12s cubic-bezier(.2,1.3,.4,1), opacity .15s .12s; }
 .pu.in .pu-star { scale: 1; opacity: 1; }
 .pu-big { fill: #3a3a3a; }
-.pu-band.k { fill: #0b0b0b; }
-.pu-band.g { fill: #3a3a3a; }
+/* 금색 별 둘레의 겹겹 별 띠 (.pu-band 는 배경의 검은 대각선 띠라서 이름을 따로 씀) */
+.pu-tier.k { fill: #0b0b0b; }
+.pu-tier.g { fill: #3a3a3a; }
 /* 금색 별: 크기는 app.js 의 용수철이 움직임 (음표가 꽂힐 때마다 부풀었다가 제 크기로) */
 .pu-gold { scale: 0; transform-box: view-box; transform-origin: 0 0; } /* 0 0 = 별 한가운데 (viewBox 가 -100~100) */
 .pu-gold .f1 { fill: #f8ae12; }
