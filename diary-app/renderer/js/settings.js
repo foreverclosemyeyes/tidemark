@@ -324,8 +324,8 @@
         C.toggle(ctx, 'layout.fxOn', '화려한 연출 (등장·넘김·체크 효과)'),
         C.toggle(ctx, 'layout.soft', '화면 전체 아주 살짝 흐리게'),
       );
-      // 스킨 그림 묶음: 파일 이름으로 자리를 찾음 (cut-city, cloud-1~3, wd-0~6, pointup, pointup-bg, rankup, rankup-bg, bubble, reply)
-      const SKIN_KEYS = ['cut-city', 'cloud-1', 'cloud-2', 'cloud-3', 'wd-0', 'wd-1', 'wd-2', 'wd-3', 'wd-4', 'wd-5', 'wd-6', 'pointup', 'pointup-bg', 'rankup', 'rankup-bg', 'bubble', 'empty', 'mask', 'dagger', 'gatsu', 'app-icon',
+      // 스킨 그림 묶음: 파일 이름으로 자리를 찾음 (cut-city, cloud-1~3, wd-0~6, pointup, pointup-bg, rankup, rankup-bg, rankmax, rankmax-bg, bubble, reply)
+      const SKIN_KEYS = ['cut-city', 'cloud-1', 'cloud-2', 'cloud-3', 'wd-0', 'wd-1', 'wd-2', 'wd-3', 'wd-4', 'wd-5', 'wd-6', 'pointup', 'pointup-bg', 'rankup', 'rankup-bg', 'rankmax', 'rankmax-bg', 'bubble', 'empty', 'mask', 'dagger', 'gatsu', 'app-icon',
         ...Array.from({ length: 10 }, (_, n) => [`digit-${n}`, `digit-${n}-red`, `digit-${n}-blue`]).flat()];
       const skin = state.theme.layout.skin || {};
       const nSkin = SKIN_KEYS.filter((k) => skin[k]).length;

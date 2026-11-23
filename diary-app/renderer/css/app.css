@@ -859,6 +859,14 @@ body.layout-bigcal .prank { font-size: 13px; letter-spacing: .02em; color: #0b0b
 .pu.in .pu-spk, .nt .pu-spk { animation: puSpk .6s var(--d) ease-out both; }
 .nt-spk { position: absolute; width: 30vh; height: 30vh; translate: -50% -50%; }
 .pu.max.t3 .pu-title { --tc: #fcfb08; } /* RANK MAX! 는 레몬색 */
+/* 글자가 흰색으로 '탁' 찍혀 있는 0.27초 동안 별과 딱지가 통째로 아주 잘게 떨림 (띠용띠용).
+   참고 영상에서 프레임마다(1/30초) 꼭짓점 끝과 딱지가 같이 1~2px(720p 기준) 씩 튀는 것을 잰 값 */
+@keyframes puShake {
+  0% { transform: translate(.14vh, 0); } 12.5% { transform: translate(0, -.28vh); } 25% { transform: translate(-.14vh, .14vh); } 37.5% { transform: translate(.14vh, 0); }
+  50% { transform: translate(0, -.28vh); } 62.5% { transform: translate(-.28vh, 0); } 75% { transform: translate(.14vh, -.28vh); } 87.5% { transform: translate(-.14vh, .14vh); } 100% { transform: none; }
+}
+.pu.t2 .pu-stage { animation: puShake .267s steps(1, end) both; }
+.pu-lab b, .pu-lab { white-space: nowrap; width: max-content; }
 /* 음표 그림 */
 .n-out > * { fill: #f5a81c; stroke: #f5a81c; stroke-width: 9; stroke-linejoin: miter; stroke-miterlimit: 3; }
 .n-in > * { fill: #0b0b0b; }
@@ -877,21 +885,27 @@ body.layout-bigcal .prank { font-size: 13px; letter-spacing: .02em; color: #0b0b
 @keyframes ntPop { from { scale: 0; } to { scale: 1; } }
 @keyframes ntJig { from { rotate: calc(var(--r) - 9deg); translate: -50% -100%; } to { rotate: calc(var(--r) + 9deg); translate: -50% -110%; } }
 .nt.fly .nt-note { animation: none; translate: calc(-50% + var(--fx)) calc(-100% + var(--fy)); scale: var(--fs); transition-delay: calc(var(--d) * .7); }
-.pu .pu-title span, .pu .pu-title span.alt { opacity: 1 !important; transform: rotate(var(--r)) !important; color: var(--tc); -webkit-text-stroke: 0; filter: none; transition: color .1s; }
+.pu .pu-title span, .pu .pu-title span.alt { opacity: 1 !important; transform: translateY(var(--y, 0)) rotate(var(--r)) skewX(-9deg) !important; font-size: calc(1em * var(--s, 1)); line-height: 1; color: var(--tc); -webkit-text-stroke: 0; filter: none; transition: color .1s; }
+/* 글자 그림(스킨)이 없을 때: 게임 글자처럼 좁고 굵은 기울인 글씨로, 글자마다 크기·높이·기울기를 달리하고 한 글자는 상자에 뒤집어 넣음 */
+.pu .pu-title:not(.img) { font-family: "Anton", "Impact", "Black Han Sans", sans-serif; font-size: clamp(60px, 15.5vh, 170px); letter-spacing: -.015em; align-items: baseline; }
+.pu .pu-title span.sp { width: .16em; }
+.pu .pu-title span.box { background: var(--tc); color: #0b0b0b; padding: .03em .08em 0; margin: 0 .035em; transition: background .1s; }
+.pu.t2 .pu-title span.box { -webkit-text-stroke: 0; outline: .075em solid #0b0b0b; }
+.pu .pu-title.img { width: min(54vh, 72vw); } /* 참고 영상에서 글자의 가로 폭 = 화면 높이의 절반쯤 */
 .pu .pu-title.img .pup-fg { background: var(--tc); transition: background .1s; }
 .pu.t1 .pu-title { opacity: 1; }
-.pu.t2 .pu-title { transform: rotate(-5deg) scale(1) !important; --tc: #fff; }
+.pu.t2 .pu-title { transform: rotate(-12deg) scale(1) !important; --tc: #fff; }
 .pu.t2 .pu-title span { -webkit-text-stroke: .11em #0b0b0b; paint-order: stroke fill; filter: drop-shadow(.05em .05em 0 #0b0b0b); }
 .pu.t2 .pu-title.img .pup-bg { opacity: 1; }
 .pu.t3 .pu-title { --tc: var(--param, #F5C518); }
-.pu.tout .pu-title { opacity: 0; transform: rotate(-5deg) scale(.9) !important; transition: transform .25s, opacity .25s; }
+.pu.tout .pu-title { opacity: 0; transform: rotate(-12deg) scale(.9) !important; transition: transform .25s, opacity .25s; }
 .pu-what { position: absolute; left: 50%; bottom: 7vh; translate: -50% 0; padding: 4px 14px; background: #fff; color: #0b0b0b; border: 3px solid #0b0b0b; font: 800 14px "Nanum Gothic", sans-serif; rotate: -2deg; opacity: 0; transition: opacity .2s 1.5s; max-width: 70vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pu.in .pu-what { opacity: 1; }
 .pu.out { opacity: 0; transition: opacity .3s; }
 .pu-ico { fill: #1c1c1c; }
 .pu-lab b { display: inline-flex; align-items: baseline; gap: 3px; background: var(--param, #F5C518); color: #0b0b0b; border: 3px solid #0b0b0b; font-family: "Black Han Sans", "Gasoek One", sans-serif; font-weight: 400; line-height: 1.15; font-size: clamp(20px, 5.4vh, 56px); border-width: 0; box-shadow: .14em .14em 0 #0b0b0b; padding: 0 .3em; }
 .pu-lab span { font: 800 clamp(9px, 1.25vh, 12px) "Nanum Gothic", sans-serif; color: #e9e9e9; white-space: nowrap; font-size: clamp(11px, 2vh, 18px); text-shadow: 0 0 3px #000; }
-.pu .pu-title { position: absolute; left: 50%; top: 50%; translate: -50% -50%; transform: rotate(-5deg) scale(1.7) !important; opacity: 0; transition: transform .2s cubic-bezier(.2,1.4,.4,1), opacity .12s; white-space: nowrap; --tc: rgba(190,190,190,.5); z-index: 3; font-size: clamp(44px, 11.5vh, 120px); }
+.pu .pu-title { position: absolute; left: 50%; top: 50%; translate: -50% -50%; transform: rotate(-12deg) scale(1.7) !important; opacity: 0; transition: transform .2s cubic-bezier(.2,1.4,.4,1), opacity .12s; white-space: nowrap; --tc: rgba(190,190,190,.5); z-index: 3; font-size: clamp(44px, 11.5vh, 120px); }
 /* POINT UP 원본 글자 그림: 별 안에 들어오는 크기로, 검은 그림자는 살짝만 */
 .pu .pu-title.img { width: min(62vh, 46vw) !important; transform: rotate(-5deg) scale(1.5) !important; }
 .pu.t2 .pu-title.img { transform: rotate(-5deg) scale(1) !important; }
