@@ -877,6 +877,9 @@
     });
   }
   // 박자 (금색 별이 생기는 순간부터의 ms). SWELL = [ms, 크기 배율]
+  // 글씨가 사라진 뒤 기다리는 동안: 방금 오른 능력치의 꼭짓점 끝과 딱지가 16프레임(0.533초)마다 톡 튀었다가 0.467초에 걸쳐 줄어듦.
+  // 튀는 양 = 꼭짓점 끝 +10px(720p. 판에서 2.67) · 딱지 1.30배. 줄어드는 모양은 (1 - t)² (영상 프레임값과 맞춰 봄). MAX 인 능력치는 안 튐
+  const IDLE = { EVERY: 533, FALL: 467, TIP: 2.67, WAIT: 130, BEATS: 3 };
   const PU = {
     HIT: 775,   // 화면이 뜬 뒤 첫 음표가 별 가운데에 닿는 때 = 금색 별이 생기는 때
     FLY: 375,   // 음표가 출발해서 가운데에 닿기까지 (CSS puNote 0.52초의 72% 지점)
@@ -925,8 +928,9 @@
     const gold = add(svg, 'g', { class: 'pu-gold' });
     const faces = Array.from({ length: 10 }, (_, k) => add(gold, 'polygon', { class: k % 2 ? 'f1' : 'f2' }));
     const marks = add(gold, 'g', {});
+    let gp = [];
     const drawGold = (gs, fresh = []) => {
-      const gp = goldPts(gs);
+      gp = goldPts(gs);
       // 면: 꼭짓점 i 의 양쪽. 시계 방향 쪽이 밝고 반대쪽이 어두움
       faces.forEach((f, k) => { const i = k >> 1; f.setAttribute('points', P(k % 2 ? [[0, 0], gp[2 * i], gp[2 * i + 1]] : [[0, 0], gp[(2 * i + 9) % 10], gp[2 * i]])); f.classList.toggle('new', fresh.includes(i)); });
       // 지나온 랭크의 눈금 점 (꼭짓점 가운데 줄 위)
@@ -984,8 +988,8 @@
     box.append(stage);
     const what = ups.slice(-2).map((c) => c.text).filter(Boolean).join(' · ');
     if (what) box.append(h('div', 'pu-what', what));
-    const timers = []; let raf = 0;
-    const close = () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); box.classList.add('out'); setTimeout(() => box.remove(), 320); };
+    const timers = []; let raf = 0, rafIdle = 0;
+    const close = () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); cancelAnimationFrame(rafIdle); box.classList.add('out'); setTimeout(() => box.remove(), 320); };
     box.onclick = close;
     document.body.append(box);
     const later = (ms, fn) => timers.push(setTimeout(fn, ms));
@@ -1011,7 +1015,24 @@
       later(T + V.label, () => ranked.forEach((i) => labels[i].classList.add('pop'))); // 오른 능력치의 딱지가 한 번 튐
       later(T + V.settle, () => { drawGold(gNow, ranked); box.classList.add('settled'); }); // 흰 부분이 금색으로
     }
-    later(T + V.end, close);
+    // 기다리는 동안의 톡톡 (IDLE 설명 참고). 딱지는 CSS(.pu.idle), 꼭짓점은 끝점만 바깥으로 밀었다 되돌림
+    const live = STATS.map((st, i) => (upped.has(st) && lvOf(st, totals[st] || 0) < 5 ? i : -1)).filter((i) => i >= 0);
+    const idleAt = T + V.title[3] + IDLE.WAIT;
+    if (live.length) later(idleAt, () => {
+      box.classList.add('idle');
+      const t0 = performance.now();
+      const beat = () => {
+        const t = ((performance.now() - t0) % IDLE.EVERY) / IDLE.FALL, f = t < 1 ? (1 - t) * (1 - t) : 0;
+        live.forEach((i) => {
+          const base = gp[2 * i], len = Math.hypot(...base), m = 1 + (IDLE.TIP * f) / len, tip = [base[0] * m, base[1] * m];
+          faces[2 * i].setAttribute('points', P([[0, 0], gp[(2 * i + 9) % 10], tip]));
+          faces[2 * i + 1].setAttribute('points', P([[0, 0], tip, gp[2 * i + 1]]));
+        });
+        rafIdle = box.isConnected ? requestAnimationFrame(beat) : 0;
+      };
+      beat();
+    });
+    later(live.length ? Math.max(T + V.end, idleAt + IDLE.EVERY * IDLE.BEATS) : T + V.end, close);
   }
   // 알록달록한 작은 별들 (랭크업). 가운데 둘레에 흩어져 반짝이며 바깥으로 살짝 밀려남. spread = 흩어지는 반지름(vh)
   function sparkles(parent, count, startMs, spread) {
