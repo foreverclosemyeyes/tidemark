@@ -191,7 +191,7 @@ class NotionMcp {
 function wrap(e, stillLoggedIn = false) {
   if (e && e.friendly) return e;
   const msg = String((e && e.message) || e);
-  if (/401|unauthor|invalid_token|invalid_grant/i.test(msg)) {
+  if (/\b401\b|unauthor|invalid_token|invalid_grant/i.test(msg)) { // \b: 요청 번호 같은 긴 글자열 속의 401 은 아님
     return stillLoggedIn
       ? Object.assign(new Error(msg), { friendly: '노션에 잠깐 연결하지 못했어요. 곧 다시 시도해요.' })
       : Object.assign(new Error(msg), { friendly: RELOGIN, relogin: true });

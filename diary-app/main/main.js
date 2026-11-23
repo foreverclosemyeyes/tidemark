@@ -252,8 +252,10 @@ function mcpSerial(fn) {
   return job;
 }
 // 쓰기 한 번: 줄을 선 뒤 pick() 으로 바꿀 글을 정하고, 쓰고 나면 그 페이지를 다시 풀어 목록·바꿀 글을 새로 맞춤
+// 들고 있던 글이 노션의 실제 글과 달라져 있으면(노션에서 직접 고쳤거나 앞선 쓰기가 다르게 반영됨) 노션이 '그런 글 없음'으로 거절한다
+// → 그 페이지를 새로 읽어 바꿀 글을 다시 정하고 한 번만 더 해 봄 (안 그러면 다음 맞추기 때까지 같은 실패가 되풀이됨)
 function mcpWrite(pageId, pick) {
-  return mcpSerial(async () => {
+  const once = async () => {
     const r = pick();
     if (!r) return;
     const [old, neu] = r;
@@ -262,6 +264,16 @@ function mcpWrite(pageId, pick) {
     if (!cur) return;
     cur.md = cur.md.replace(old, () => neu);
     mcpReparse(pageId);
+  };
+  return mcpSerial(async () => {
+    try { await once(); } catch (e) {
+      const cur = mcpPages.get(pageId);
+      if (!cur || !/No matches found/i.test(String(e && e.message))) throw e;
+      console.error('[mcp write] stale text, refetching', pageId);
+      cur.md = await mcp.fetchPage(pageId);
+      mcpReparse(pageId);
+      await once();
+    }
   });
 }
 // 들고 있는 페이지 글을 다시 풀어서 그 주의 목록·바꿀 글을 새로 맞춤
@@ -937,7 +949,17 @@ async function toggleTodo(blockId, checked) {
 }
 
 // ---------- 시계 (자정 넘김 / 2분 새로고침 / 정시 체크) ----------
+// 사람이 자리에 없는 동안은 뒤에서 노션과 맞추지 않는다: 잠듦 · 화면 잠김 · 30분 넘게 손을 안 댐이면 아무것도 안 하고,
+// 5분 넘게 손을 안 댔으면 2분마다의 맞추기만 쉰다 (정시 알림은 자리에 있을 수 있으니 계속).
+// 잠든 Mac 은 가끔 혼자 잠깐 깨는데, 그때 보낸 요청은 답이 오기 전에 다시 잠들어 끊기기 쉽다. 노션 로그인 갱신이 그렇게 끊기면
+// 노션 쪽은 이미 새 토큰으로 바꿨는데 앱은 그 답을 못 받아서, 다음 갱신 때 '로그인이 풀림'이 된다 (문제 기록에서 확인한 순서).
+const IDLE_SYNC_S = 5 * 60, IDLE_GONE_S = 30 * 60;
+let asleep = false, locked = false;
+function idleSeconds() { try { return powerMonitor.getSystemIdleTime(); } catch { return 0; } }
+
 function tick() {
+  const idle = idleSeconds();
+  if (asleep || locked || idle >= IDLE_GONE_S) return; // 돌아오면(다음 15초 안에) 날짜 넘어감·맞추기를 이어서 함
   const now = new Date();
   const t = isoOf(now);
   if (t !== state.today) {
@@ -947,7 +969,7 @@ function tick() {
     state.viewMonth = t.slice(0, 7);
     push('day-changed', { today: t });
     sync(true); // 월요일이면 여기서 새 주차 페이지를 다시 찾음
-  } else if (Date.now() - lastSyncAt >= SYNC_MS) {
+  } else if (idle < IDLE_SYNC_S && Date.now() - lastSyncAt >= SYNC_MS) {
     sync(false);
   }
 
@@ -1396,6 +1418,8 @@ app.whenReady().then(() => {
   setInterval(tick, 15 * 1000);
   setTimeout(checkUpdate, 8000);
   setInterval(checkUpdate, 6 * 60 * 60 * 1000);
-  powerMonitor.on('resume', () => setTimeout(tick, 3000));
-  powerMonitor.on('unlock-screen', () => setTimeout(tick, 3000));
+  powerMonitor.on('suspend', () => { asleep = true; });
+  powerMonitor.on('lock-screen', () => { locked = true; });
+  powerMonitor.on('resume', () => { asleep = false; setTimeout(tick, 8000); }); // 깨어난 직후엔 인터넷이 아직 안 붙어 있을 수 있음
+  powerMonitor.on('unlock-screen', () => { locked = false; setTimeout(tick, 8000); });
 });
