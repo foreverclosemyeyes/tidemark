@@ -70,7 +70,7 @@ function newPageId(result, sourceId) {
 
 async function createViaMcp(mcp, cfg, week) {
   const T = '{T}', q = (s) => `'${String(s).replace(/'/g, "''")}'`;
-  const exists = await mcp.sql(cfg.dataSourceId, `SELECT url FROM ${T} WHERE Name LIKE '%${NAME_KEY}%' AND "date:기간:start" >= ${q(week.monday)} AND "date:기간:start" <= ${q(week.friday)} LIMIT 1`);
+  const exists = await mcp.sql(cfg.dataSourceId, `SELECT url FROM ${T} WHERE Name LIKE '%${NAME_KEY}%' AND "담당자" LIKE ${q(`%${cfg.userId}%`)} AND "date:기간:start" >= ${q(week.monday)} AND "date:기간:start" <= ${q(week.friday)} LIMIT 1`);
   if (exists.length) return { created: false };
   // 본보기: 내 페이지 중 가장 최근 주
   const src = await mcp.sql(cfg.dataSourceId, `SELECT url FROM ${T} WHERE Name LIKE '%${NAME_KEY}%' AND "담당자" LIKE ${q(`%${cfg.userId}%`)} AND "date:기간:start" < ${q(week.monday)} ORDER BY "date:기간:start" DESC LIMIT 1`);
@@ -113,7 +113,7 @@ function blocks(week, { calloutIcon = { type: 'emoji', emoji: '👉' }, calloutC
 
 async function createViaApi(client, cfg, week) {
   const title = { property: 'Name', title: { contains: NAME_KEY } };
-  const exists = await client.queryDataSource(cfg.dataSourceId, { filter: { and: [title, { property: '기간', date: { on_or_after: week.monday } }, { property: '기간', date: { on_or_before: week.friday } }] } });
+  const exists = await client.queryDataSource(cfg.dataSourceId, { filter: { and: [title, { property: '담당자', people: { contains: cfg.userId } }, { property: '기간', date: { on_or_after: week.monday } }, { property: '기간', date: { on_or_before: week.friday } }] } });
   if (exists.length) return { created: false };
   const before = await client.queryDataSource(cfg.dataSourceId, {
     filter: { and: [title, { property: '담당자', people: { contains: cfg.userId } }, { property: '기간', date: { before: week.monday } }, { property: '기간', date: { on_or_after: addDays(week.monday, -90) } }] },

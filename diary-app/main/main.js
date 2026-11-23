@@ -317,7 +317,7 @@ async function readViaMcp() {
     const questRows = await mcp.sql(c.dataSourceId, `SELECT ${cols} FROM ${T} WHERE "담당자" LIKE ${me} AND "상태" IN ('진행중','시작 전')`);
     state.quests = questRows.map(rowToPage).filter((p) => !p.name.includes('운영성 업무'))
       .sort((a, b) => (a.end || '9999').localeCompare(b.end || '9999'));
-    const weekRows = await mcp.sql(c.dataSourceId, `SELECT ${cols} FROM ${T} WHERE Name LIKE '%운영성 업무%' AND "date:기간:start" <= ${sqlStr(end)} AND "date:기간:start" >= ${sqlStr(notion.shiftISO(start, -14))}`);
+    const weekRows = await mcp.sql(c.dataSourceId, `SELECT ${cols} FROM ${T} WHERE Name LIKE '%운영성 업무%' AND "담당자" LIKE ${me} AND "date:기간:start" <= ${sqlStr(end)} AND "date:기간:start" >= ${sqlStr(notion.shiftISO(start, -14))}`);
     const pages = weekRows.map(rowToPage).filter((p) => p.start && (p.end || p.start) >= start && p.start <= end).sort((a, b) => a.start.localeCompare(b.start));
     try {
       const evMode = store.get('settings', {}).eventMode || 'all';

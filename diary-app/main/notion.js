@@ -315,12 +315,13 @@ async function fetchQuests(client, cfg) {
     .sort((a, b) => (a.end || '9999').localeCompare(b.end || '9999'));
 }
 
-// 이번 달(앞뒤 주 포함)에 걸친 운영성 업무 페이지 찾기
+// 이번 달(앞뒤 주 포함)에 걸친 내 운영성 업무 페이지 찾기 (같은 DB 에 다른 사람의 같은 이름 페이지가 있어도 섞이지 않게 담당자가 나인 것만)
 async function fetchWeeklyPages(client, cfg, rangeStart, rangeEnd) {
   const pages = await client.queryDataSource(cfg.dataSourceId, {
     filter: {
       and: [
         { property: 'Name', title: { contains: '운영성 업무' } },
+        { property: '담당자', people: { contains: cfg.userId } },
         { property: '기간', date: { on_or_before: rangeEnd } },
         { property: '기간', date: { on_or_after: shiftISO(rangeStart, -14) } },
       ],
