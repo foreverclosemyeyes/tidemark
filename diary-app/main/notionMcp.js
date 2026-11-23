@@ -200,6 +200,15 @@ function wrap(e, stillLoggedIn = false) {
   return Object.assign(new Error(msg), { friendly: `노션 연결 오류: ${msg.slice(0, 120)}` });
 }
 
+// 항목 하나가 차지하는 마지막 줄: 그 줄 아래로 더 들여쓴 줄(하위 체크박스·메모·글머리 등)이 이어지는 데까지.
+// 지우거나 옮길 때 하위 내용이 따로 떨어져 남지 않게 함
+const indentOf = (ln) => ln.match(/^\s*/)[0].replace(/\t/g, '  ').length;
+function subtreeEnd(lines, i) {
+  let end = i;
+  for (let k = i + 1; k < lines.length && lines[k].trim() && indentOf(lines[k]) > indentOf(lines[i]); k++) end = k;
+  return end;
+}
+
 // ---------- 마크다운 체크리스트 파싱 ----------
 const DATE_RE = /^\s*#{1,6}\s*(\d{1,2})\s*[/.월]\s*(\d{1,2})/;
 const TODO_RE = /^(\s*)- \[( |x|X)\]\s?(.*)$/;
@@ -279,11 +288,7 @@ function parseMarkdown(md, pageId, startISO) {
     const block = lines.slice(secStart, i + 1);
     const toggled = ln.replace(/- \[( |x|X)\]/, tm[2] === ' ' ? '- [x]' : '- [ ]');
     // 지우기용: 이 항목과 그 아래 하위 항목 줄까지
-    let endL = i;
-    for (let k = i + 1; k < lines.length; k++) {
-      const m2 = lines[k].match(/^(\s*)- \[/);
-      if (m2 && m2[1].replace(/\t/g, '  ').length > indent) endL = k; else break;
-    }
+    const endL = subtreeEnd(lines, i);
     const delBlock = lines.slice(secStart, endL + 1);
     anchors.set(id, { id, pageId, line: i, oldStr: block.join('\n'), newStr: [...block.slice(0, -1), toggled].join('\n'),
       delOld: delBlock.join('\n'), delNew: lines.slice(secStart, i).join('\n') });
@@ -326,11 +331,7 @@ function parseFlat(md, pageId) {
     const one = block(i, i);
     const toggled = lines[i].replace(/- \[( |x|X)\]/, tm[2] === ' ' ? '- [x]' : '- [ ]');
     // 지우기: 하위 체크박스 줄까지. 지운 자리에 남길 글이 있도록 가능하면 바로 윗줄(없으면 아랫줄)을 끼워서 바꾼다
-    let endL = i;
-    for (let k = i + 1; k < lines.length; k++) {
-      const m2 = lines[k].match(/^(\s*)- \[/);
-      if (m2 && m2[1].replace(/\t/g, '  ').length > indent) endL = k; else break;
-    }
+    const endL = subtreeEnd(lines, i);
     let delOld, delNew;
     if (i > 0) { const d = block(i - 1, endL); delOld = d.str; delNew = lines.slice(d.start, i).join('\n'); }
     else if (endL + 1 < lines.length) { delOld = lines.slice(0, endL + 2).join('\n'); delNew = lines[endL + 1]; }
@@ -353,12 +354,7 @@ function parseFlat(md, pageId) {
 // 돌려주는 { old, neu }: 두 항목을 모두 덮는 구간(페이지에서 한 번만 나오게 위로 넓힘)과 순서를 바꾼 결과. 옮길 게 없으면 null
 function reorderEdit(md, aLine, bLine, after) {
   const lines = md.split('\n');
-  const width = (ln) => ln.match(/^\s*/)[0].replace(/\t/g, '  ').length;
-  const span = (start) => { // 그 항목과 그 아래 더 들여쓴 체크박스 줄들
-    let end = start;
-    for (let k = start + 1; k < lines.length; k++) { if (/^\s*- \[/.test(lines[k]) && width(lines[k]) > width(lines[start])) end = k; else break; }
-    return [start, end];
-  };
+  const span = (start) => [start, subtreeEnd(lines, start)]; // 그 항목과 그 아래 더 들여쓴 줄들
   const [a0, a1] = span(aLine), [b0, b1] = span(bLine);
   if (a0 === b0 || (a0 > b0 && a0 <= b1) || (b0 > a0 && b0 <= a1)) return null; // 자기 자신이나 자기 하위로는 못 옮김
   const lo = Math.min(a0, b0), hi = Math.max(a1, b1);

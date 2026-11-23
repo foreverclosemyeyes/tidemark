@@ -177,6 +177,16 @@ console.log('✓ 노션 로그인(MCP) 마크다운 파싱 테스트 통과');
   assert.strictEqual(reorderEdit(page, 1, 1, true), null);
   assert.strictEqual(reorderEdit(page, 1, 2, false), null, '이미 그 자리');
   assert.strictEqual(page.split('\n').slice(6).join('|'), run(1, 4, true).slice(6).join('|'), '다른 날은 그대로');
+  // 하위에 체크박스가 아닌 내용(메모·글머리)이 딸린 항목: 통째로 따라가고, 남의 하위로 끼어들지 않음
+  const noted = ['#### 11/23 (월)', '- [ ] A', '\t- 메모 한 줄', '\t- [ ] A1', '- [ ] B', '\t설명 글', '- [ ] C'].join('\n');
+  const mv = (a, b, after) => { const e = reorderEdit(noted, a, b, after); return noted.replace(e.old, () => e.neu).split('\n').slice(1); };
+  assert.deepStrictEqual(mv(1, 6, true), ['- [ ] B', '\t설명 글', '- [ ] C', '- [ ] A', '\t- 메모 한 줄', '\t- [ ] A1'], '메모와 하위 항목이 같이 감');
+  assert.strictEqual(reorderEdit(noted, 6, 4, true), null, 'C 는 이미 B(와 그 설명 글) 바로 뒤');
+  assert.deepStrictEqual(mv(4, 1, false), ['- [ ] B', '\t설명 글', '- [ ] A', '\t- 메모 한 줄', '\t- [ ] A1', '- [ ] C'], '설명 글을 데리고 앞으로');
+  assert.deepStrictEqual(mv(6, 1, true), ['- [ ] A', '\t- 메모 한 줄', '\t- [ ] A1', '- [ ] C', '- [ ] B', '\t설명 글'], 'A 의 하위 내용 뒤에 놓임');
+  // 지우기도 하위 내용까지
+  const dA = parseMarkdown(noted, 'P', '2026-11-23').anchors.get('P:2026-11-23:1');
+  assert.strictEqual(noted.replace(dA.delOld, () => dA.delNew), ['#### 11/23 (월)', '- [ ] B', '\t설명 글', '- [ ] C'].join('\n'), '메모가 따로 남지 않음');
   console.log('✓ 순서 바꾸기 테스트 통과');
 }
 

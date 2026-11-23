@@ -589,8 +589,8 @@ async function reorderTodo(id, refId, after) {
   try {
     const token = secrets.get('notion');
     if (token) {
-      await moveBlockViaApi(new notion.NotionClient(token), a, b, after);
-      await sync(true); // 새로 만든 블록의 id 로 다시 읽음
+      for (const l of questLists.values()) l.live = false; // 업무 페이지의 항목이면 그 목록도 꼭 다시 읽게
+      try { await moveBlockViaApi(new notion.NotionClient(token), a, b, after); } finally { await sync(true); } // 새로 만든 블록의 id 로 다시 읽음 (중간에 실패해도)
       return { ok: true };
     }
     if (!(mcp && mcp.loggedIn())) throw Object.assign(new Error('no notion'), { friendly: notConnected() });
@@ -609,9 +609,13 @@ async function reorderTodo(id, refId, after) {
 // 노션 API 에는 블록을 옮기는 기능이 없다 → 같은 내용의 블록을 원하는 자리에 새로 만들고 원래 것을 지움.
 // 하위 내용이 딸린 블록은 그 내용을 잃을 수 있어서 옮기지 않는다
 async function moveBlockViaApi(client, a, b, after) {
-  const cloneAfter = async (srcId, afterId) => {
-    const blk = await client.request('GET', `/blocks/${srcId}`);
+  const read = async (id) => {
+    const blk = await client.request('GET', `/blocks/${id}`);
     if (blk.has_children) throw Object.assign(new Error('has children'), { friendly: '하위 내용이 있는 항목은 노션에서 옮겨 주세요.' });
+    return blk;
+  };
+  const cloneAfter = async (srcId, afterId) => {
+    const blk = await read(srcId);
     const parentId = blk.parent[blk.parent.type];
     const res = await client.request('PATCH', `/blocks/${parentId}/children`, { after: afterId, children: [{ object: 'block', type: 'to_do', to_do: { rich_text: blk.to_do.rich_text, checked: blk.to_do.checked, color: blk.to_do.color } }] });
     await client.deleteBlock(srcId);
@@ -621,7 +625,8 @@ async function moveBlockViaApi(client, a, b, after) {
   const prev = b.list[b.index - 1];                       // 기준의 앞 = 그 앞 항목의 뒤
   if (prev && prev.id === a.item.id) return null;         // 이미 그 자리
   if (prev) return cloneAfter(a.item.id, prev.id);
-  const moved = await cloneAfter(a.item.id, b.item.id);   // 맨 앞으로: 기준 뒤에 놓은 다음, 기준을 그 뒤로 보냄
+  await read(b.item.id);                                  // 맨 앞으로는 기준도 새로 만들어야 하므로, 손대기 전에 옮길 수 있는지 먼저 확인
+  const moved = await cloneAfter(a.item.id, b.item.id);   // 기준 뒤에 놓은 다음, 기준을 그 뒤로 보냄
   return cloneAfter(b.item.id, moved);
 }
 

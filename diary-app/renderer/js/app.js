@@ -673,8 +673,8 @@
   // 능력치 하나의 '자람' 0~1: Lv1 시작 = 0, Lv5 = 1. 등급 사이에서도 조금씩 자람
   const growOf = (st, v) => { const lv = lvOf(st, v || 0), L = LV[st]; if (lv >= 5) return 1; return (lv - 1 + ((v || 0) - L[lv - 1]) / (L[lv] - L[lv - 1])) / 4; };
   // 가운데 별의 꼭짓점 10개: 능력치마다(위·오른쪽·오른쪽 아래·왼쪽 아래·왼쪽) 끝이 그 능력치만큼 뻗음
-  function statStarPts(totals, cx, cy, rMin, rMax, inner = 0.42, extra = null) { // extra: 능력치별로 끝을 더 내미는 길이 (포인트업 연출용)
-    const tip = STATS.map((st, i) => rMin + (rMax - rMin) * growOf(st, totals[st]) + (extra ? extra[i] : 0));
+  function statStarPts(totals, cx, cy, rMin, rMax, inner = 0.42) {
+    const tip = STATS.map((st, i) => rMin + (rMax - rMin) * growOf(st, totals[st]));
     return Array.from({ length: 10 }, (_, k) => {
       const a = -Math.PI / 2 + (k * Math.PI) / 5;
       const i = k >> 1;
@@ -828,7 +828,7 @@
       });
       if (rank) { // 랭크업: 머리 위 음표 둘레에 알록달록한 작은 별
         const sp = h('div', 'nt-spk'); Object.assign(sp.style, { left: `${hx}px`, top: `${hy - 5 * vh}px` });
-        sparkles(sp, 9, 120, 50); layer.append(sp);
+        sparkles(sp, 9, 120, 15); layer.append(sp);
       }
       document.body.append(layer);
       setTimeout(() => layer.classList.add('fly'), 1150);
@@ -868,9 +868,12 @@
     return STAR.TIP.flatMap((_, i) => {
       const j = (i + 1) % 5, a = gs[i], b = gs[j];
       const hit = Math.abs(a - b) < 1e-4 ? null : cross(tipAt(i, a), dipAt(i, a), tipAt(j, b), dipAt(i, b));
-      const lo = dipAt(i, Math.min(a, b)), hi = dipAt(i, Math.max(a, b));
-      const ok = hit && Math.hypot(...hit) >= Math.hypot(...lo) - 0.5 && Math.hypot(...hit) <= Math.hypot(...hi) + 0.5;
-      return [tipAt(i, a), ok ? hit : dipAt(i, (a + b) / 2)];
+      // 만나는 점이 두 고리의 오목한 점 사이에 있고, 짧은 쪽 꼭짓점보다 충분히 안쪽일 때만 씀.
+      // (랭크 차이가 아주 크면 긴 쪽의 변이 짧은 꼭짓점을 넘어가 버림 → 그때는 낮은 쪽 고리의 오목한 점으로)
+      const lo = dipAt(i, Math.min(a, b)), hi = dipAt(i, Math.max(a, b)), r = hit ? Math.hypot(...hit) : 0;
+      const short = Math.min(Math.hypot(...tipAt(i, a)), Math.hypot(...tipAt(j, b)));
+      const ok = hit && r >= Math.hypot(...lo) - 0.5 && r <= Math.hypot(...hi) + 0.5 && r <= short * 0.85;
+      return [tipAt(i, a), ok ? hit : lo];
     });
   }
   // 박자 (금색 별이 생기는 순간부터의 ms). SWELL = [ms, 크기 배율]
@@ -893,7 +896,7 @@
       gleam: 800, title: [630, 733, 967, 1767], end: 3100, skin: 'rankup',
       letters: [['R', 1.04, 0, -4], ['A', 0.84, 0.03, 4], ['N', 0.68, 0, -2, 1], ['K', 1.14, -0.06, 3], [' '], ['U', 1.1, -0.05, -2], ['P', 1, -0.1, 3], ['!', 1.28, -0.16, 5], ['!', 1.28, -0.21, 5]],
       beam: [[0, 0.9], [33, 2.07], [100, 2.25], [667, 2.28], [700, 1.69], [733, 1.17], [767, 1]], // 흰 뻗음의 길이 (새 꼭짓점 길이의 배)
-      label: 230, settle: 1530, // 딱지의 랭크가 바뀌는 때, 흰 부분이 금색이 되는 때
+      label: 230, settle: 1530, // 오른 능력치의 딱지가 튀는 때, 흰 부분이 금색이 되는 때
     },
   };
   const keyAt = (keys, ms) => { // [ms, 값] 목록에서 ms 때의 값 (사이는 곧게 이음)
@@ -917,20 +920,20 @@
     for (let k = 0; k < 5; k++) STAR.TIP.forEach((_, i) => { const [x, y] = tipAt(i, k / 4); add(svg, 'circle', { cx: x.toFixed(1), cy: y.toFixed(1), r: 0.7, class: 'pu-mark' }); });
     // 금색 별: 꼭짓점이 능력치마다 그만큼 뻗음. 랭크업은 오르기 전 모양으로 시작해서 끝에 새 모양이 됨
     const gNow = STATS.map((st) => growOf(st, totals[st] || 0)), gWas = STATS.map((st) => growOf(st, was[st] || 0));
-    const rankI = kind === 'rank' ? STATS.findIndex((st) => lvOf(st, totals[st] || 0) > lvOf(st, was[st] || 0)) : -1;
-    const beam = rankI >= 0 ? add(svg, 'polygon', { class: 'pu-beam' }) : null; // 금색 별 밑에 깔림 (밑동은 가려짐)
+    const ranked = kind === 'rank' ? STATS.map((st, i) => (lvOf(st, totals[st] || 0) > lvOf(st, was[st] || 0) ? i : -1)).filter((i) => i >= 0) : []; // 랭크가 오른 능력치들
+    const beams = ranked.map(() => add(svg, 'polygon', { class: 'pu-beam' })); // 금색 별 밑에 깔림 (밑동은 가려짐)
     const gold = add(svg, 'g', { class: 'pu-gold' });
     const faces = Array.from({ length: 10 }, (_, k) => add(gold, 'polygon', { class: k % 2 ? 'f1' : 'f2' }));
     const marks = add(gold, 'g', {});
-    const drawGold = (gs, fresh = -1) => {
+    const drawGold = (gs, fresh = []) => {
       const gp = goldPts(gs);
       // 면: 꼭짓점 i 의 양쪽. 시계 방향 쪽이 밝고 반대쪽이 어두움
-      faces.forEach((f, k) => { const i = k >> 1; f.setAttribute('points', P(k % 2 ? [[0, 0], gp[2 * i], gp[2 * i + 1]] : [[0, 0], gp[(2 * i + 9) % 10], gp[2 * i]])); f.classList.toggle('new', i === fresh); });
+      faces.forEach((f, k) => { const i = k >> 1; f.setAttribute('points', P(k % 2 ? [[0, 0], gp[2 * i], gp[2 * i + 1]] : [[0, 0], gp[(2 * i + 9) % 10], gp[2 * i]])); f.classList.toggle('new', fresh.includes(i)); });
       // 지나온 랭크의 눈금 점 (꼭짓점 가운데 줄 위)
       marks.replaceChildren();
       gs.forEach((g, i) => { for (let k = 0; k < 5; k++) if (k / 4 < g - 0.04) { const [x, y] = tipAt(i, k / 4); add(marks, 'circle', { cx: x.toFixed(1), cy: y.toFixed(1), r: 0.7, class: 'gm' }); } });
     };
-    drawGold(rankI >= 0 ? gWas : gNow);
+    drawGold(ranked.length ? gWas : gNow);
     // 가운데의 밝은 작은 별 (제 크기로 돌아온 뒤 번져 나옴)
     const core = ringPts(0, 0.72);
     core.forEach((pt, k) => add(gold, 'polygon', { points: P([[0, 0], pt, core[(k + 1) % 10]]), class: k % 2 ? 'g1' : 'g2' }));
@@ -950,10 +953,12 @@
       const lab = h('div', 'pu-lab' + (upped.has(sName) ? ' up' : ''));
       lab.style.left = `${STAR.LABEL[i][0]}%`; lab.style.top = `${STAR.LABEL[i][1]}%`;
       lab.style.setProperty('--d', `${i * 45}ms`); lab.style.setProperty('--r', `${[-8, 6, -5, 7, -6][i]}deg`);
-      const fill = (v) => { const lv = lvOf(sName, v || 0); const tag = h('b', null, sName); tag.append(h('i', null, lv >= 5 ? 'MAX' : String(lv))); lab.replaceChildren(tag, h('span', null, RANKS[sName][lv - 1] || '')); lab.classList.toggle('max', lv >= 5); };
-      fill(i === rankI ? was[sName] : totals[sName]);
+      const lv = lvOf(sName, totals[sName] || 0); // 랭크업이어도 딱지는 처음부터 새 랭크로 나옴 (영상과 같음)
+      const tag = h('b', null, sName); tag.append(h('i', null, lv >= 5 ? 'MAX' : String(lv)));
+      lab.append(tag, h('span', null, RANKS[sName][lv - 1] || ''));
+      lab.classList.toggle('max', lv >= 5);
       stage.append(lab);
-      return { el: lab, fill };
+      return lab;
     });
     // 음표들이 화면 밖에서 크게 날아와 별 가운데에 납작하게 꽂힘 (첫 음표가 닿는 순간 금색 별이 생김)
     const notes = noteCount(ups);
@@ -963,7 +968,7 @@
       stage.append(n);
     });
     // 랭크업: 음표 둘레에 알록달록한 작은 별들이 반짝임
-    if (kind === 'rank') sparkles(stage, 14, PU.HIT - 260, 46);
+    if (kind === 'rank') sparkles(stage, 14, PU.HIT - 260, 48);
     // 글자: 스킨 그림이 있으면 그 모양을(흰 그림을 틀로 써서 색을 입힘), 없으면 글자로
     const title = h('div', 'pup-title pu-title');
     if (sk[V.skin]) {
@@ -990,33 +995,32 @@
     const T = PU.HIT, span = V.swell[V.swell.length - 1][0];
     later(T, () => {
       gold.animate(V.swell.map(([ms, sc]) => ({ scale: String(sc), offset: ms / span })), { duration: span, fill: 'forwards' });
-      if (!beam) return;
+      if (!ranked.length) return;
       // 흰 뻗음: 오른 능력치의 꼭짓점이 새 길이의 2배 넘게 뻗었다가, 별이 제 크기로 돌아올 때 새 길이로 줄어들어 남음
-      const t0 = performance.now(), tipNew = tipAt(rankI, gNow[rankI]), end = V.beam[V.beam.length - 1][0];
-      const base = [dipAt((rankI + 4) % 5, gWas[rankI]), dipAt(rankI, gWas[rankI])];
+      const t0 = performance.now(), end = V.beam[V.beam.length - 1][0];
       const draw = () => {
         const ms = performance.now() - t0, m = keyAt(V.beam, ms);
-        beam.setAttribute('points', P([base[0], [tipNew[0] * m, tipNew[1] * m], base[1]]));
+        ranked.forEach((i, n) => { const tip = tipAt(i, gNow[i]); beams[n].setAttribute('points', P([dipAt((i + 4) % 5, gWas[i]), [tip[0] * m, tip[1] * m], dipAt(i, gWas[i])])); });
         raf = ms < end && box.isConnected ? requestAnimationFrame(draw) : 0;
       };
       draw();
     });
     at(T, 'gold'); at(T + V.gleam, 'gleam');
     at(T + V.title[0], 't1'); at(T + V.title[1], 't2'); at(T + V.title[2], 't3'); at(T + V.title[3], 'tout');
-    if (rankI >= 0) {
-      later(T + V.label, () => { labels[rankI].fill(totals[STATS[rankI]]); labels[rankI].el.classList.add('pop'); });
-      later(T + V.settle, () => { drawGold(gNow, rankI); box.classList.add('settled'); }); // 흰 부분이 금색으로
+    if (ranked.length) {
+      later(T + V.label, () => ranked.forEach((i) => labels[i].classList.add('pop'))); // 오른 능력치의 딱지가 한 번 튐
+      later(T + V.settle, () => { drawGold(gNow, ranked); box.classList.add('settled'); }); // 흰 부분이 금색으로
     }
     later(T + V.end, close);
   }
-  // 알록달록한 작은 별들 (랭크업). 가운데 둘레에 흩어져 반짝이며 바깥으로 살짝 밀려남
+  // 알록달록한 작은 별들 (랭크업). 가운데 둘레에 흩어져 반짝이며 바깥으로 살짝 밀려남. spread = 흩어지는 반지름(vh)
   function sparkles(parent, count, startMs, spread) {
     const COLORS = ['#7df25c', '#ffd84a', '#ff7b9c', '#ffe98a'];
     for (let k = 0; k < count; k++) {
       const s = svgEl('svg', { viewBox: '-10 -10 20 20', class: 'pu-spk' });
       s.append(svgEl('polygon', { points: starPts(9, 3.8).map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' ') }));
       const a = Math.random() * Math.PI * 2, r = spread * (0.35 + Math.random() * 0.65);
-      [['--x', `${(Math.cos(a) * r).toFixed(1)}%`], ['--y', `${(Math.sin(a) * r * 0.8 - 6).toFixed(1)}%`], ['--s', (0.5 + Math.random() * 0.8).toFixed(2)], ['--c', COLORS[k % COLORS.length]],
+      [['--x', `${(Math.cos(a) * r).toFixed(1)}vh`], ['--y', `${(Math.sin(a) * r * 0.8 - spread * 0.12).toFixed(1)}vh`], ['--s', (0.5 + Math.random() * 0.8).toFixed(2)], ['--c', COLORS[k % COLORS.length]],
         ['--d', `${Math.round(startMs + Math.random() * 520)}ms`], ['--r', `${Math.round(Math.random() * 360)}deg`]].forEach(([prop, v]) => s.style.setProperty(prop, v));
       parent.append(s);
     }

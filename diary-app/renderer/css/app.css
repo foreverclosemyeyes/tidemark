@@ -735,17 +735,6 @@ body.layout-bigcal #quests .panel-head::after, body.layout-bigcal #stats .panel-
 .ps-pip.on { fill: var(--param); }
 .plabel:hover .pctl { opacity: 1; }
 /* POINT UP!! / RANK UP!! */
-.pup { position: fixed; inset: 0; z-index: 150; display: grid; place-items: center; pointer-events: auto; cursor: pointer; background: radial-gradient(circle at 50% 50%, rgba(0,0,0,.55), rgba(0,0,0,.25) 60%, transparent 80%); opacity: 0; transition: opacity .25s; }
-.pup.in { opacity: 1; }
-.pup.out { opacity: 0; transition: opacity .35s; }
-.pup.in .pup-burst { transform: scale(1) rotate(-8deg); }
-.pup.in .pup-title { transform: rotate(-12deg) scale(1); }
-.pup.rank .pup-title { font-size: 104px; }
-.pup-lines { position: absolute; top: calc(50% + 120px); display: flex; flex-direction: column; gap: 6px; align-items: center; }
-.pup-line { display: flex; gap: 8px; align-items: center; transform: rotate(-4deg) translateY(16px); opacity: 0; transition: .35s .3s; }
-.pup.in .pup-line { transform: rotate(-4deg); opacity: 1; }
-.pup-line b { background: var(--param); color: #111; font-family: "Gasoek One", sans-serif; font-weight: 400; font-size: 20px; padding: 2px 10px; box-shadow: 3px 3px 0 #111; }
-.pup-line span { color: #fff; font-weight: 800; font-size: 16px; text-shadow: 0 2px 0 #111; }
 body.layout-bigcal .plabel { padding: 2px 10px; background: none; }
 /* ---------- 인간 파라미터 v2 ---------- */
 .ps-facet { fill: rgba(255,255,255,.07); }
@@ -761,13 +750,9 @@ body.layout-bigcal .plabel { padding: 2px 10px; background: none; }
 .plv { font-weight: 900; line-height: 1.3; border: 2.5px solid #0b0b0b; border-left: 0; background: #0b0b0b; color: var(--param); font-size: 15px; padding: 0 6px; margin-bottom: -6px; }
 .prank { font-weight: 800; margin-top: 3px; white-space: nowrap; color: #fff; font-size: 13px; letter-spacing: .02em; text-shadow: 0 2px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000; }
 /* POINT UP v2 */
-.pup-burst { position: absolute; clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); transform: scale(.3) rotate(-30deg); transition: transform .45s cubic-bezier(.3,1.6,.4,1); box-shadow: none; width: 560px; height: 560px; background: #161616; filter: drop-shadow(10px 10px 0 var(--accent)); }
-.pup-burst::after { content: ''; position: absolute; clip-path: inherit; inset: 26%; background: conic-gradient(from 18deg, var(--param) 0 36deg, color-mix(in srgb, var(--param) 72%, #6b4a00) 36deg 72deg, var(--param) 72deg 108deg, color-mix(in srgb, var(--param) 72%, #6b4a00) 108deg 144deg, var(--param) 144deg 180deg, color-mix(in srgb, var(--param) 72%, #6b4a00) 180deg 216deg, var(--param) 216deg 252deg, color-mix(in srgb, var(--param) 72%, #6b4a00) 252deg 288deg, var(--param) 288deg 324deg, color-mix(in srgb, var(--param) 72%, #6b4a00) 324deg 360deg); }
 .pup-title { position: relative; font-family: "Gasoek One", sans-serif; font-size: 92px; color: var(--param); paint-order: stroke fill; transition: transform .4s .1s cubic-bezier(.3,1.8,.4,1); letter-spacing: -2px; display: flex; align-items: center; -webkit-text-stroke: 0; filter: none; transform: rotate(-12deg) scale(.4); }
 .pup-title span { display: inline-block; color: var(--param); -webkit-text-stroke: 11px #0b0b0b; paint-order: stroke fill; filter: drop-shadow(5px 5px 0 #0b0b0b); transform: rotate(var(--r)) translateY(30px); opacity: 0; transition: transform .35s var(--d) cubic-bezier(.3,1.8,.4,1), opacity .2s var(--d); }
-.pup-title span.alt { font-size: 1.14em; color: #fff; }
 .pup-title span.sp { width: .25em; }
-.pup.in .pup-title span { transform: rotate(var(--r)); opacity: 1; }
 /* 파라미터 v2 다듬기 */
 body.layout-bigcal .nb-pane[data-pane="params"] #stats { justify-content: flex-start; }
 .ps-big { stroke: #111; stroke-width: 3; stroke-linejoin: round; fill: url(#psg); }
@@ -855,11 +840,12 @@ body.layout-bigcal .prank { font-size: 13px; letter-spacing: .02em; color: #0b0b
 .pu.gold .pu-lab.up { animation: puBump .35s .35s both; }
 .pu-lab.max b { background: #fff000; }
 .pu-lab.max b i { font-size: .62em; letter-spacing: -.02em; }
-.pu-lab.pop { animation: puBump .32s both !important; }
+@keyframes puPop { 0% { scale: 1; } 40% { scale: 1.4; } 100% { scale: 1; } }
+.pu.gold .pu-lab.pop { animation: puPop .32s both; }
 /* 랭크업의 알록달록한 작은 별 */
 .pu-spk { position: absolute; left: calc(50% + var(--x)); top: calc(50% + var(--y)); width: 6.4%; height: auto; translate: -50% -50%; overflow: visible; opacity: 0; pointer-events: none; }
 .pu-spk polygon { fill: var(--c); filter: drop-shadow(0 0 2px var(--c)); }
-@keyframes puSpk { 0% { scale: 0; rotate: var(--r); opacity: 0; } 25% { scale: var(--s); opacity: 1; } 70% { opacity: 1; } 100% { scale: calc(var(--s) * .35); rotate: calc(var(--r) + 80deg); translate: calc(-50% + var(--x) * .25) calc(-50% + var(--y) * .25); opacity: 0; } }
+@keyframes puSpk { 0% { scale: 0; rotate: var(--r); opacity: 0; } 25% { scale: var(--s); opacity: 1; } 70% { opacity: 1; } 100% { scale: calc(var(--s) * .35); rotate: calc(var(--r) + 80deg); translate: calc(-50% + var(--x) * .25) calc(-50% + var(--y) * .25); opacity: 0; } } /* --x·--y 는 vh 길이 */
 .pu.in .pu-spk, .nt .pu-spk { animation: puSpk .6s var(--d) ease-out both; }
 .nt-spk { position: absolute; width: 30vh; height: 30vh; translate: -50% -50%; }
 .pu.max.t3 .pu-title { --tc: #fcfb08; } /* RANK MAX! 는 레몬색 */
@@ -889,13 +875,12 @@ body.layout-bigcal .prank { font-size: 13px; letter-spacing: .02em; color: #0b0b
 @keyframes ntPop { from { scale: 0; } to { scale: 1; } }
 @keyframes ntJig { from { rotate: calc(var(--r) - 9deg); translate: -50% -100%; } to { rotate: calc(var(--r) + 9deg); translate: -50% -110%; } }
 .nt.fly .nt-note { animation: none; translate: calc(-50% + var(--fx)) calc(-100% + var(--fy)); scale: var(--fs); transition-delay: calc(var(--d) * .7); }
-.pu .pu-title span, .pu .pu-title span.alt { opacity: 1 !important; transform: translateY(var(--y, 0)) rotate(var(--r)) skewX(-9deg) !important; font-size: calc(1em * var(--s, 1)); line-height: 1; color: var(--tc); -webkit-text-stroke: 0; filter: none; transition: color .1s; }
+.pu .pu-title span { opacity: 1 !important; transform: translateY(var(--y, 0)) rotate(var(--r)) skewX(-9deg) !important; font-size: calc(1em * var(--s, 1)); line-height: 1; color: var(--tc); -webkit-text-stroke: 0; filter: none; transition: color .1s; }
 /* 글자 그림(스킨)이 없을 때: 게임 글자처럼 좁고 굵은 기울인 글씨로, 글자마다 크기·높이·기울기를 달리하고 한 글자는 상자에 뒤집어 넣음 */
 .pu .pu-title:not(.img) { font-family: "Anton", "Impact", "Black Han Sans", sans-serif; font-size: clamp(60px, 15.5vh, 170px); letter-spacing: -.015em; align-items: baseline; }
 .pu .pu-title span.sp { width: .16em; }
 .pu .pu-title span.box { background: var(--tc); color: #0b0b0b; padding: .03em .08em 0; margin: 0 .035em; transition: background .1s; }
 .pu.t2 .pu-title span.box { -webkit-text-stroke: 0; outline: .075em solid #0b0b0b; }
-.pu .pu-title.img { width: min(54vh, 72vw); } /* 참고 영상에서 글자의 가로 폭 = 화면 높이의 절반쯤 */
 .pu .pu-title.img .pup-fg { background: var(--tc); transition: background .1s; }
 .pu.t1 .pu-title { opacity: 1; }
 .pu.t2 .pu-title { transform: rotate(-12deg) scale(1) !important; --tc: #fff; }
@@ -911,8 +896,9 @@ body.layout-bigcal .prank { font-size: 13px; letter-spacing: .02em; color: #0b0b
 .pu-lab span { font: 800 clamp(9px, 1.25vh, 12px) "Nanum Gothic", sans-serif; color: #e9e9e9; white-space: nowrap; font-size: clamp(11px, 2vh, 18px); text-shadow: 0 0 3px #000; }
 .pu .pu-title { position: absolute; left: 50%; top: 50%; translate: -50% -50%; transform: rotate(-12deg) scale(1.7) !important; opacity: 0; transition: transform .2s cubic-bezier(.2,1.4,.4,1), opacity .12s; white-space: nowrap; --tc: rgba(190,190,190,.5); z-index: 3; font-size: clamp(44px, 11.5vh, 120px); }
 /* POINT UP 원본 글자 그림: 별 안에 들어오는 크기로, 검은 그림자는 살짝만 */
-.pu .pu-title.img { width: min(62vh, 46vw) !important; transform: rotate(-5deg) scale(1.5) !important; }
-.pu.t2 .pu-title.img { transform: rotate(-5deg) scale(1) !important; }
+/* 가로 폭 = 화면 높이의 절반쯤, 기울기 -12° (참고 영상에서 잰 값) */
+.pu .pu-title.img { width: min(54vh, 46vw) !important; transform: rotate(-12deg) scale(1.5) !important; }
+.pu.t2 .pu-title.img { transform: rotate(-12deg) scale(1) !important; }
 .pu .pu-title.img .pup-bg { opacity: 0; inset: -6% -4% -8% -4%; transform: translate(4px, 5px); }
 
 /* ==================== 하루 시작 컷 ==================== */
@@ -1004,7 +990,7 @@ body.layout-bigcal .prank { font-size: 13px; letter-spacing: .02em; color: #0b0b
 .cut-note.only-hall { padding: 10px 14px; }
 .cut-note.only-hall .cut-hall { margin: 0; font-size: 18px; }
 /* ===== 살짝 흐리게: 화면 전체를 아주 조금만 흐림 (색·밝기는 그대로). 설정 창과 작은 메뉴는 또렷하게 둠 ===== */
-body.soft #bg, body.soft #app, body.soft .pu, body.soft .pup, body.soft .ps2, body.soft #chat-log { filter: blur(var(--soft, .35px)); }
+body.soft #bg, body.soft #app, body.soft .pu, body.soft .ps2, body.soft #chat-log { filter: blur(var(--soft, .35px)); }
 /* 날짜 컷은 화면 전체가 계속 움직이므로, 전체 흐림 대신 숫자·요일·연월에만 흐림을 같이 구워 넣음 (--cut-soft) */
 body.soft .cut { --cut-soft: var(--soft, .35px); }
 .cut.pop .cut-dagger { opacity: 1; translate: 0 0; }
