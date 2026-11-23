@@ -851,10 +851,14 @@ body.layout-bigcal .prank { font-size: 13px; letter-spacing: .02em; color: #0b0b
 .pu.max.t3 .pu-title { --tc: #fcfb08; } /* RANK MAX! 는 레몬색 */
 /* 글자가 흰색으로 '탁' 찍혀 있는 0.27초 동안 별과 딱지가 통째로 아주 잘게 떨림 (띠용띠용).
    참고 영상에서 프레임마다(1/30초) 꼭짓점 끝과 딱지가 같이 1~2px(720p 기준) 씩 튀는 것을 잰 값 */
-@keyframes puShake {
-  0% { transform: translate(.14vh, 0); } 12.5% { transform: translate(0, -.28vh); } 25% { transform: translate(-.14vh, .14vh); } 37.5% { transform: translate(.14vh, 0); }
-  50% { transform: translate(0, -.28vh); } 62.5% { transform: translate(-.28vh, 0); } 75% { transform: translate(.14vh, -.28vh); } 87.5% { transform: translate(-.14vh, .14vh); } 100% { transform: none; }
+@keyframes puShake { /* 프레임마다의 어긋남 (영상에서 잰 순서 그대로). --q = 1px(720p)에 해당하는 길이 */
+  0% { transform: translate(calc(var(--q) * 1.4), calc(var(--q) * .9)); } 12.5% { transform: translate(calc(var(--q) * -.2), calc(var(--q) * -1.4)); }
+  25% { transform: translate(calc(var(--q) * -1.1), var(--q)); } 37.5% { transform: translate(calc(var(--q) * 1.5), calc(var(--q) * .8)); }
+  50% { transform: translate(calc(var(--q) * .5), calc(var(--q) * -1.2)); } 62.5% { transform: translate(calc(var(--q) * -1.6), calc(var(--q) * .5)); }
+  75% { transform: translate(var(--q), calc(var(--q) * -1)); } 87.5% { transform: translate(calc(var(--q) * .1), calc(var(--q) * 1.5)); } 100% { transform: none; }
 }
+/* 창이 작으면 화면 비율대로는 1px 도 안 돼서 떨림이 안 보임 → 적어도 1.4px 단위로 */
+.pu-stage { --q: max(.139vh, 1.4px); }
 .pu.t2 .pu-stage { animation: puShake .267s steps(1, end) both; }
 .pu-lab b, .pu-lab { white-space: nowrap; width: max-content; }
 /* 음표 그림 */
