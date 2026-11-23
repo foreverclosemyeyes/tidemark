@@ -20,7 +20,7 @@ const QT = require('./questTodos');
 const docsLib = require('./docs');
 const packLib = require('./pack');
 const updater = require('./updater');
-const { NotionMcp, RELOGIN, parseMarkdown, parseFlat, cleanText, escapeText, lastLine, markOf, locateMark } = require('./notionMcp');
+const { NotionMcp, RELOGIN, parseMarkdown, parseFlat, reorderEdit, cleanText, escapeText, lastLine, markOf, locateMark } = require('./notionMcp');
 
 // ---------- 오류 기록 (문제가 생기면 원인을 알 수 있게) ----------
 let logFile = null;
@@ -574,6 +574,55 @@ async function editTodo(id, text) {
     console.error('[edit todo]', e);
     return { ok: false, message: e.friendly || '노션에서 고치지 못했어요.' };
   }
+}
+
+// ---------- 체크리스트 순서 바꾸기 ----------
+// id 항목(하위 항목 포함)을 같은 목록의 refId 항목 앞/뒤로 옮김. 날짜 체크리스트든 업무 체크리스트든 같은 방식
+async function reorderTodo(id, refId, after) {
+  if (id === refId) return { ok: true };
+  if (QT.isId(id)) return questTodo((all) => QT.move(all, id, refId, after)) ? { ok: true } : gone; // 이 컴퓨터에만 있는 업무 항목
+  const a = findItem(id), b = findItem(refId);
+  if (!a || !b) return gone;
+  if (a.list !== b.list) return { ok: false, message: '같은 목록 안에서만 순서를 바꿀 수 있어요.' };
+  const moveLocal = () => { a.list.splice(a.index, 1); const k = a.list.indexOf(b.item); a.list.splice(after ? k + 1 : k, 0, a.item); };
+  if (offline()) { moveLocal(); saveLocal(); pushData(); return { ok: true }; }
+  try {
+    const token = secrets.get('notion');
+    if (token) {
+      await moveBlockViaApi(new notion.NotionClient(token), a, b, after);
+      await sync(true); // 새로 만든 블록의 id 로 다시 읽음
+      return { ok: true };
+    }
+    if (!(mcp && mcp.loggedIn())) throw Object.assign(new Error('no notion'), { friendly: notConnected() });
+    const ma = markOf(mcpAnchors, id), mb = markOf(mcpAnchors, refId);
+    await mcpWrite(ma.pageId, () => {
+      const edit = reorderEdit(mcpPages.get(ma.pageId).md, locateMark(mcpAnchors, ma).line, locateMark(mcpAnchors, mb).line, after);
+      return edit ? [edit.old, edit.neu] : null;
+    });
+    pushData();
+    return { ok: true };
+  } catch (e) {
+    console.error('[reorder todo]', e);
+    return { ok: false, message: e.friendly || '노션에서 순서를 바꾸지 못했어요.' };
+  }
+}
+// 노션 API 에는 블록을 옮기는 기능이 없다 → 같은 내용의 블록을 원하는 자리에 새로 만들고 원래 것을 지움.
+// 하위 내용이 딸린 블록은 그 내용을 잃을 수 있어서 옮기지 않는다
+async function moveBlockViaApi(client, a, b, after) {
+  const cloneAfter = async (srcId, afterId) => {
+    const blk = await client.request('GET', `/blocks/${srcId}`);
+    if (blk.has_children) throw Object.assign(new Error('has children'), { friendly: '하위 내용이 있는 항목은 노션에서 옮겨 주세요.' });
+    const parentId = blk.parent[blk.parent.type];
+    const res = await client.request('PATCH', `/blocks/${parentId}/children`, { after: afterId, children: [{ object: 'block', type: 'to_do', to_do: { rich_text: blk.to_do.rich_text, checked: blk.to_do.checked, color: blk.to_do.color } }] });
+    await client.deleteBlock(srcId);
+    return res.results[0].id;
+  };
+  if (after) return cloneAfter(a.item.id, b.item.id);
+  const prev = b.list[b.index - 1];                       // 기준의 앞 = 그 앞 항목의 뒤
+  if (prev && prev.id === a.item.id) return null;         // 이미 그 자리
+  if (prev) return cloneAfter(a.item.id, prev.id);
+  const moved = await cloneAfter(a.item.id, b.item.id);   // 맨 앞으로: 기준 뒤에 놓은 다음, 기준을 그 뒤로 보냄
+  return cloneAfter(b.item.id, moved);
 }
 
 // ---------- 체크리스트를 다른 날짜로 넘기기 ----------
@@ -1179,6 +1228,7 @@ function registerIpc() {
   ipcMain.handle('todo:delete', (_e, id) => deleteTodo(String(id)));
   ipcMain.handle('todo:add', (_e, date, text) => addTodo(String(date), String(text)));
   ipcMain.handle('todo:move', (_e, id, date) => moveTodo(String(id), String(date)));
+  ipcMain.handle('todo:reorder', (_e, id, refId, after) => reorderTodo(String(id), String(refId), !!after));
   ipcMain.handle('todo:edit', (_e, id, text) => editTodo(String(id), String(text)));
   ipcMain.handle('todo:toggle', (_e, id, checked) => toggleTodo(String(id), !!checked));
   ipcMain.handle('theme:save', (_e, theme) => { store.set('theme', theme); applyAppIcon(); return true; });

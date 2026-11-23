@@ -347,6 +347,31 @@ function parseFlat(md, pageId) {
   return { items, anchors, adder: { old: block(tail, tail).str, indent } };
 }
 
+// ---------- 순서 바꾸기 ----------
+// 체크박스 하나(하위 줄 포함)를 같은 목록의 다른 체크박스 앞/뒤로 옮기는 '바꿀 글'을 만든다.
+// aLine = 옮길 항목의 줄 번호, bLine = 기준 항목의 줄 번호 (parse 가 anchors 에 넣어 둔 line), after = 기준의 뒤로?
+// 돌려주는 { old, neu }: 두 항목을 모두 덮는 구간(페이지에서 한 번만 나오게 위로 넓힘)과 순서를 바꾼 결과. 옮길 게 없으면 null
+function reorderEdit(md, aLine, bLine, after) {
+  const lines = md.split('\n');
+  const width = (ln) => ln.match(/^\s*/)[0].replace(/\t/g, '  ').length;
+  const span = (start) => { // 그 항목과 그 아래 더 들여쓴 체크박스 줄들
+    let end = start;
+    for (let k = start + 1; k < lines.length; k++) { if (/^\s*- \[/.test(lines[k]) && width(lines[k]) > width(lines[start])) end = k; else break; }
+    return [start, end];
+  };
+  const [a0, a1] = span(aLine), [b0, b1] = span(bLine);
+  if (a0 === b0 || (a0 > b0 && a0 <= b1) || (b0 > a0 && b0 <= a1)) return null; // 자기 자신이나 자기 하위로는 못 옮김
+  const lo = Math.min(a0, b0), hi = Math.max(a1, b1);
+  const region = lines.slice(lo, hi + 1), block = lines.slice(a0, a1 + 1);
+  region.splice(a0 - lo, block.length);
+  const at = b0 - lo - (a0 < b0 ? block.length : 0);
+  region.splice(after ? at + (b1 - b0 + 1) : at, 0, ...block);
+  let start = lo, old = lines.slice(start, hi + 1).join('\n');
+  while (start > 0 && md.split(old).length - 1 > 1) { start--; old = lines.slice(start, hi + 1).join('\n'); }
+  const neu = [...lines.slice(start, lo), ...region].join('\n');
+  return old === neu ? null : { old, neu };
+}
+
 // ---------- 바꿀 줄 다시 찾기 ----------
 // 항목 id 는 '그 날짜의 몇 번째'라서, 위 항목이 지워지면 번호가 밀린다. 누른 순간의 그 줄을 기억해 두었다가(markOf)
 // 실제로 쓸 차례가 왔을 때 같은 줄을 다시 찾는다(locateMark). 못 찾거나 같은 줄이 여럿이면 엉뚱한 줄을 건드리지 않고 그만둔다.
@@ -364,4 +389,4 @@ function locateMark(anchors, mark) {
   throw Object.assign(new Error('anchor moved'), { friendly: '그 사이 내용이 바뀌었어요. 다시 해 주세요.' });
 }
 
-module.exports = { NotionMcp, refreshOnce, RELOGIN, parseMarkdown, parseFlat, cleanText, escapeText, lastLine, markOf, locateMark, REDIRECT };
+module.exports = { NotionMcp, refreshOnce, RELOGIN, parseMarkdown, parseFlat, reorderEdit, cleanText, escapeText, lastLine, markOf, locateMark, REDIRECT };

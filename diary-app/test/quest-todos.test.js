@@ -20,4 +20,11 @@ assert.strictEqual(QT.remove(all, b.id).text, '초안 쓰기 (2쪽)');
 assert.deepStrictEqual(all, {}, '마지막 항목을 지우면 업무 칸도 비움');
 QT.add(all, 'q1', 'x'); QT.add(all, 'q2', 'y'); QT.drop(all, 'q1');
 assert.deepStrictEqual(Object.keys(all), ['q2']);
+// 순서 바꾸기
+{
+  const m = {}; const [x, y, z] = ['하나', '둘', '셋'].map((t) => QT.add(m, 'q', t)); const o = QT.add(m, 'other', '남');
+  assert.ok(QT.move(m, z.id, x.id, false)); assert.deepStrictEqual(m.q.map((i) => i.text), ['셋', '하나', '둘']);
+  assert.ok(QT.move(m, z.id, y.id, true)); assert.deepStrictEqual(m.q.map((i) => i.text), ['하나', '둘', '셋']);
+  assert.ok(!QT.move(m, x.id, o.id, true), '다른 업무의 항목과는 못 바꿈'); assert.ok(!QT.move(m, x.id, x.id, true));
+}
 console.log('✓ 업무별 체크리스트 테스트 통과');

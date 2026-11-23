@@ -300,7 +300,8 @@
     const close = (e) => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('pointerdown', close, true); } };
     setTimeout(() => document.addEventListener('pointerdown', close, true), 0);
   }
-  function todoNode(item) {
+  let drag = null; // 끌고 있는 체크리스트 항목 { id, ids: 같은 목록의 id 들 }
+  function todoNode(item, siblings) {
     const wrap = document.createDocumentFragment();
     const row = h('div', 'todo' + (item.checked ? ' done' : ''));
     row.append(h('span', 'box', item.checked ? '✓' : ''));
@@ -355,10 +356,35 @@
       row.classList.remove('busy');
       if (!r.ok) toast(r.message, 5000);
     };
+    // 끌어서 순서 바꾸기: 같은 목록(같은 날, 같은 상위 항목 아래) 안에서 다른 줄의 위쪽·아래쪽 절반에 놓음
+    row.draggable = true;
+    row.ondragstart = (e) => {
+      if (row.querySelector('.todo-edit')) { e.preventDefault(); return; }
+      drag = { id: item.id, ids: new Set(siblings.map((x) => x.id)) };
+      e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', item.text);
+      row.classList.add('dragging');
+    };
+    row.ondragover = (e) => {
+      if (!drag || drag.id === item.id || !drag.ids.has(item.id)) return; // 다른 목록의 줄 위에서는 놓을 수 없음
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+      const r = row.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
+      row.classList.toggle('drop-after', after); row.classList.toggle('drop-before', !after);
+    };
+    row.ondragleave = () => row.classList.remove('drop-before', 'drop-after');
+    row.ondrop = async (e) => {
+      if (!drag || !drag.ids.has(item.id)) return;
+      e.preventDefault();
+      const after = row.classList.contains('drop-after'), id = drag.id;
+      row.classList.remove('drop-before', 'drop-after'); row.classList.add('busy');
+      const r = await window.diary.reorderTodo(id, item.id, after);
+      row.classList.remove('busy');
+      if (!r.ok) toast(r.message, 5000);
+    };
+    row.ondragend = () => { drag = null; row.classList.remove('dragging'); document.querySelectorAll('.drop-before, .drop-after').forEach((x) => x.classList.remove('drop-before', 'drop-after')); if (renderRecord.stale) renderRecord(); };
     wrap.append(row);
     if (item.children && item.children.length) {
       const ch = h('div', 'todo-children');
-      item.children.forEach((c) => ch.append(todoNode(c)));
+      item.children.forEach((c) => ch.append(todoNode(c, item.children)));
       wrap.append(ch);
     }
     return wrap;
@@ -448,9 +474,9 @@
     } else stamp.hidden = true;
     const list = $('#record-list');
     // 글을 고치는 중이면 목록은 그대로 둠 (동기화가 와서 치던 글이 사라지지 않게). 고치기가 끝나면 다시 그림
-    renderRecord.stale = !!list.querySelector('.todo-edit');
+    renderRecord.stale = !!list.querySelector('.todo-edit') || !!drag; // 고치는 중·끄는 중에는 그대로
     if (renderRecord.stale) { /* 아래 버튼만 갱신 */ }
-    else if (info && info.items.length) list.replaceChildren(...info.items.map(todoNode));
+    else if (info && info.items.length) list.replaceChildren(...info.items.map((it) => todoNode(it, info.items)));
     else {
       list.innerHTML = '';
       const qs = quest && (state.data.questState || {})[qKey(quest)]; // 노션 업무일 때만 있음

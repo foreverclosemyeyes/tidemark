@@ -32,6 +32,15 @@ function remove(all, id) {
   if (!f.list.length) delete all[f.key];
   return f.item;
 }
+// 같은 업무 안에서 순서 바꾸기: id 를 ref 의 앞/뒤로
+function move(all, id, refId, after) {
+  const f = locate(all, id), r = locate(all, refId);
+  if (!f || !r || f.key !== r.key || id === refId) return false;
+  f.list.splice(f.index, 1);
+  const k = f.list.findIndex((x) => x.id === refId);
+  f.list.splice(after ? k + 1 : k, 0, f.item);
+  return true;
+}
 const drop = (all, questId) => { delete all[keyOf(questId)]; };
 
-module.exports = { isId, keyOf, locate, add, toggle, edit, remove, drop };
+module.exports = { isId, keyOf, locate, add, toggle, edit, remove, move, drop };

@@ -163,6 +163,23 @@ console.log('✓ 노션 로그인(MCP) 마크다운 파싱 테스트 통과');
   console.log('✓ 업무 페이지 체크리스트 파싱 테스트 통과');
 }
 
+// 순서 바꾸기: 항목(하위 줄 포함)을 같은 목록의 다른 항목 앞/뒤로. 바꿀 글은 페이지에서 한 번만 나와야 함
+{
+  const { reorderEdit } = require('../main/notionMcp');
+  const page = ['#### 11/23 (월)', '- [ ] 가', '- [x] 나', '\t- [ ] 나의 하위', '- [ ] 다 $& 7\\~9', '- [ ] 가', '#### 11/24 (화)', '- [ ] 가'].join('\n');
+  const run = (a, b, after) => { const e = reorderEdit(page, a, b, after); assert.strictEqual(page.split(e.old).length - 1, 1, '한 번만'); return page.replace(e.old, () => e.neu).split('\n'); };
+  assert.deepStrictEqual(run(2, 1, false).slice(1, 6), ['- [x] 나', '\t- [ ] 나의 하위', '- [ ] 가', '- [ ] 다 $& 7\\~9', '- [ ] 가'], '하위 줄을 데리고 앞으로');
+  assert.deepStrictEqual(run(1, 4, true).slice(1, 6), ['- [x] 나', '\t- [ ] 나의 하위', '- [ ] 다 $& 7\\~9', '- [ ] 가', '- [ ] 가'], '뒤로');
+  assert.deepStrictEqual(run(4, 2, false).slice(1, 6), ['- [ ] 가', '- [ ] 다 $& 7\\~9', '- [x] 나', '\t- [ ] 나의 하위', '- [ ] 가']);
+  assert.deepStrictEqual(run(1, 2, true).slice(1, 6), ['- [x] 나', '\t- [ ] 나의 하위', '- [ ] 가', '- [ ] 다 $& 7\\~9', '- [ ] 가'], '기준의 하위 줄 뒤에 놓임');
+  assert.deepStrictEqual(run(5, 1, false).slice(1, 6), ['- [ ] 가', '- [ ] 가', '- [x] 나', '\t- [ ] 나의 하위', '- [ ] 다 $& 7\\~9'], '맨 끝의 것을 맨 앞으로');
+  assert.strictEqual(reorderEdit(page, 2, 3, true), null, '자기 하위로는 못 옮김');
+  assert.strictEqual(reorderEdit(page, 1, 1, true), null);
+  assert.strictEqual(reorderEdit(page, 1, 2, false), null, '이미 그 자리');
+  assert.strictEqual(page.split('\n').slice(6).join('|'), run(1, 4, true).slice(6).join('|'), '다른 날은 그대로');
+  console.log('✓ 순서 바꾸기 테스트 통과');
+}
+
 // 노션 로그인 유지: 갱신 요청이 겹쳐도 한 번만 나가고, 로그인이 풀리면 조용히 사라지지 않고 표시가 남음
 (async () => {
   const { NotionMcp, refreshOnce } = require('../main/notionMcp');
