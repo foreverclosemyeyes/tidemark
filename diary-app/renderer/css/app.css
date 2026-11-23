@@ -889,7 +889,7 @@ body.layout-bigcal .prank { font-size: 13px; letter-spacing: .02em; color: #0b0b
 .pu.in .pu-what { opacity: 1; }
 .pu.out { opacity: 0; transition: opacity .3s; }
 .pu-ico { fill: #1c1c1c; }
-.pu-lab b { display: inline-flex; align-items: baseline; gap: 3px; background: var(--param, #F5C518); color: #0b0b0b; border: 3px solid #0b0b0b; font-family: "Black Han Sans", "Gasoek One", sans-serif; font-weight: 400; line-height: 1.15; font-size: clamp(20px, 4.6vh, 48px); border-width: 0; box-shadow: .14em .14em 0 #0b0b0b; padding: 0 .3em; }
+.pu-lab b { display: inline-flex; align-items: baseline; gap: 3px; background: var(--param, #F5C518); color: #0b0b0b; border: 3px solid #0b0b0b; font-family: "Black Han Sans", "Gasoek One", sans-serif; font-weight: 400; line-height: 1.15; font-size: clamp(20px, 5.4vh, 56px); border-width: 0; box-shadow: .14em .14em 0 #0b0b0b; padding: 0 .3em; }
 .pu-lab span { font: 800 clamp(9px, 1.25vh, 12px) "Nanum Gothic", sans-serif; color: #e9e9e9; white-space: nowrap; font-size: clamp(11px, 2vh, 18px); text-shadow: 0 0 3px #000; }
 .pu .pu-title { position: absolute; left: 50%; top: 50%; translate: -50% -50%; transform: rotate(-5deg) scale(1.7) !important; opacity: 0; transition: transform .2s cubic-bezier(.2,1.4,.4,1), opacity .12s; white-space: nowrap; --tc: rgba(190,190,190,.5); z-index: 3; font-size: clamp(44px, 11.5vh, 120px); }
 /* POINT UP 원본 글자 그림: 별 안에 들어오는 크기로, 검은 그림자는 살짝만 */
