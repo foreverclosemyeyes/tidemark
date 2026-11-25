@@ -223,8 +223,16 @@ function seed() {
   check('최근 7일 읽기: 언제부터 며칠째인지도 말함',(await text('.state .flow')).includes('일째') && (await text('.state .flow')).includes('경조증 기준 기간(4일)을 넘음'));
   check('최근 7일 읽기: 들뜬 날이 이어지면 겹치는 점을 근거와 함께 보여 줌', (await text('.state')).includes('경조증·조증 때의 모습과 많이 겹쳐요') && (await text('.state')).includes('경조증 기준 증상 7가지 중') && (await text('.state')).includes('진단이 아니에요'));
   await page.click('[data-tab=trend]');
-  check('주 흐름: 한 장에 기분·에너지 선, 잠, 띠가 같은 가로축에 (항목마다 따로 있던 카드는 없음)', (await page.$$('#app .flow')).length === 1 && (await page.$$('.flow svg.flow-chart path')).length === 2
+  check('주 흐름: 한 장에 기분·에너지 선, 잠, 띠가 같은 가로축에 (항목마다 따로 있던 카드는 없음)', (await page.$$('#app .flow')).length === 1 && (await page.$$('.flow svg.flow-chart path')).length === 3
     && (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 7 && (await text('.flow')).includes('스트레스') && !(await page.$('.mcard')));
+  // 선과 띠는 하나씩 끌 수 있고, 꺼 둔 것은 남는다
+  await page.click('.flowkeys [data-k=conf]'); await page.click('.flowkeys [data-k=stress]');
+  check('딱지를 누르면 그 선·띠가 꺼짐 (자신감, 스트레스)', (await page.$$('.flow svg.flow-chart path')).length === 2 && !(await text('.flow')).includes('스트레스') && (await store()).settings.flowOff.join() === 'conf,stress'
+    && (await page.getAttribute('.flowkeys [data-k=conf]', 'aria-pressed')) === 'false');
+  await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=trend]');
+  check('꺼 둔 것은 다시 열어도 꺼져 있음', (await page.$$('.flow svg.flow-chart path')).length === 2 && !(await text('.flow')).includes('스트레스'));
+  await page.click('.flowkeys [data-k=stress]');
+  check('다시 누르면 켜짐', (await text('.flow')).includes('스트레스') && (await store()).settings.flowOff.join() === 'conf');
   check('약은 띠로 그리지 않음', !(await text('.flow')).includes('브린텔릭스'));
   check('흐름 그림이 카드 밖으로 안 넘침', await page.evaluate(() => [...document.querySelectorAll('.flow svg')].every((el) => el.getBoundingClientRect().right <= el.closest('.card').getBoundingClientRect().right + 0.5)));
   await page.click('[data-mode=month]');
@@ -232,8 +240,8 @@ function seed() {
   const box = await page.$eval('.flow svg.flow-chart', (x) => { const r = x.getBoundingClientRect(); return [r.left, r.top]; });
   await page.mouse.click(box[0] + 4, box[1] + 30);
   check('날짜를 누르면 그날 값이 뜸', await page.isVisible('.pickbar') && /기분 \d/.test(await text('.pickbar')));
-  await page.click('[data-mode=quarter]');
-  check('3달 흐름: 13주가 하루 한 칸씩', (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 91 && await page.isDisabled('[data-act=shift][data-step="1"]'));
+  await page.click('[data-mode=half]');
+  check('6달 흐름: 26주가 한 주 한 칸씩', (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 26 && await page.isDisabled('[data-act=shift][data-step="1"]') && (await text('.segc')).replace(/\s/g, '') === '주1달6달12달');
   await page.click('[data-mode=month]');
   await page.click('[data-mode=week]');
   check('보기를 바꿔도 오늘이 든 기간을 보여 줌 (월 → 주)', await page.isDisabled('[data-act=shift][data-step="1"]'));
@@ -260,7 +268,7 @@ function seed() {
 
   // 5-2. 진료 탭: 다음 진료일, 말할 것, 요약
   await page.click('[data-tab=clinic]');
-  check('진료 화면에는 그래프가 없고 들고 갈 것들만 있음', !(await page.$('#app svg.flow-chart')) && !!(await page.$('#c-next')) && !!(await page.$('#c-note')) && !!(await page.$('[data-act=printSummary]')) && !!(await page.$('[data-act=copyAi]')));
+  check('진료 화면에는 그래프가 없고 들고 갈 것들만 있음', !(await page.$('#app svg.flow-chart')) && !!(await page.$('#c-next')) && !!(await page.$('#c-note')) && await page.isVisible('.btn[data-act=printSummary]') && !!(await page.$('[data-act=copyAi]')));
   await page.fill('#c-note', '약 먹으면 오후에 졸림'); await page.press('#c-note', 'Enter');
   check('말할 것 추가 (엔터)', (await store()).clinic.notes[0] === '약 먹으면 오후에 졸림' && (await text('#talk')).includes('약 먹으면 오후에 졸림'));
   await page.fill('#c-next', dayAgo(-3));
@@ -279,7 +287,7 @@ function seed() {
   await page.click('[data-act=logSave]');
   check('약 바꾼 날이 기록됨', (await store()).clinic.log[0].kind === 'med' && (await text('#log')).includes('10mg → 15mg'));
   await page.click('[data-tab=trend]'); await page.click('[data-mode=week]');
-  check('약 바꾼 날이 흐름 그래프에 세로선으로 표시됨', (await text('.ylegend')).includes('약 변경') && (await page.$$('.flow svg.flow-chart line[stroke-opacity="0.8"]')).length === 1);
+  check('약 바꾼 날이 흐름 그래프에 세로선으로 표시됨', (await text('.flowkeys')).includes('약 변경') && (await page.$$('.flow svg.flow-chart line[stroke-opacity="0.8"]')).length === 1);
   await page.click('[data-tab=clinic]');
   check('진료 메모가 없으면 "진료 후" 단추가 없음', (await page.$$('[data-act=clinicWeeks][data-w=since]')).length === 0);
   await page.click('[data-act=logAdd][data-kind=visit]');
@@ -418,8 +426,8 @@ function seed() {
   });
   await page.reload(); await page.waitForSelector('h1');
   await page.click('[data-tab=trend]'); await page.click('[data-act=mode][data-mode=year]');
-  check('년 보기: 한 칸이 한 주이고 선과 띠가 한 장에 그려짐', (await page.$$('.flow svg.flow-chart path')).length === 2 && (await page.$$('.flow .yrow')).length >= 4 && (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 52);
-  check('약은 안 먹은 주만 그래프 아래 점으로', (await page.$$('.flow svg.flow-chart circle')).length >= 5 && (await text('.ylegend')).includes('약 안 먹은 날') && !(await text('.flow')).includes('브린텔릭스'));
+  check('년 보기: 한 칸이 한 주이고 선과 띠가 한 장에 그려짐', (await page.$$('.flow svg.flow-chart path')).length >= 2 && (await page.$$('.flow .yrow')).length >= 4 && (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 52);
+  check('약은 안 먹은 주만 그래프 아래 점으로', (await page.$$('.flow svg.flow-chart circle')).length >= 5 && (await text('.flowkeys')).includes('약 안 먹은 날') && !(await text('.flow')).includes('브린텔릭스'));
   check('년 보기에서 미래로는 못 넘김', await page.isDisabled('[data-act=shift][data-step="1"]'));
   await page.click('[data-act=shift][data-step="-1"]');
   check('이전으로 넘기면 석 달 앞의 한 해가 나오고 다시 앞으로 올 수 있음', !(await page.isDisabled('[data-act=shift][data-step="1"]')));
@@ -495,7 +503,7 @@ function seed() {
   await page.click('[data-act=close]');
   check('병원 · 상담용으로 쓰면 기록이 없을 때 소개가 보임', !!(await page.$('.intro [data-act=demoFlow]')));
   await page.click('[data-act=demoFlow]');
-  check('"예시 보기"를 누르면 흐름 화면이 예시 기록으로 열림 (3달 보기)', (await page.$$('.flow svg.flow-chart path')).length === 2 && (await page.getAttribute('[data-mode=quarter]', 'aria-pressed')) === 'true' && (await text('.ylegend')).includes('약 변경'));
+  check('"예시 보기"를 누르면 흐름 화면이 예시 기록으로 열림 (6달 보기)', (await page.$$('.flow svg.flow-chart path')).length >= 2 && (await page.getAttribute('[data-mode=half]', 'aria-pressed')) === 'true' && (await text('.flowkeys')).includes('약 변경'));
   check('예시는 저장되지 않음', Object.keys((await store()).entries).length === 0 && ((await store()).clinic.log || []).length === 0);
   await page.click('[data-act=demo]');
   check('예시를 닫으면 내 흐름으로 돌아옴', !(await text('#app')).includes('예시 기록'));

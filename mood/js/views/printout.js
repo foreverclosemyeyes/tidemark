@@ -19,6 +19,7 @@ export function printoutHtml(weeks) {
   const mondays = cols.map((_, i) => i).filter((i) => parse(cols[i].start).getDay() === 1);
   const labels = (weeks === 1 ? cols.map((_, i) => i) : mondays).map((i) => [i, shortDate(cols[i].start), weeks === 1 ? 'mid' : 'left']);
   // 맨 위 숫자 네 칸: 평균을 크게, 가장 낮은 날–높은 날을 작게
+  const sheet = sheetHtml({ cols, width: PAGE, labels, guides: weeks === 1 ? [] : mondays.filter(Boolean) });
   const stat = (name, st, fmt) => `<div class="po-stat"><span>${name}</span><b>${st ? fmt(st.avg) : '–'}</b><small>${st ? `${fmt(st.min)} – ${fmt(st.max)}` : T('기록 없음')}</small></div>`;
   const num = (x) => (Number.isInteger(x) ? String(x) : one(x)), dur = (m) => durText(Math.round(m));
   const stats = [['mood', T('기분')], ['energy', T('에너지')], ['conf', T('자신감')]].filter(([k]) => itemOn(k)).map(([k, name]) => stat(name, s[k], num)).join('')
@@ -33,7 +34,7 @@ export function printoutHtml(weeks) {
       <p>${md(parse(s.dates[0]))} – ${md(parse(s.dates[s.dates.length - 1]))} · ${F('기록 {0}일 / {1}일', s.got.length, s.dates.length)}</p></div>
       <div class="po-brand">Tidemark<small>${longDate(today())}</small></div></header>
     ${stats ? `<div class="po-stats">${stats}</div>` : ''}
-    <div class="po-figs">${sheetHtml({ cols, width: PAGE, labels, guides: weeks === 1 ? [] : mondays.filter(Boolean) })}</div>
+    <div class="po-figs"><div class="flowkeys">${sheet.keys}</div>${sheet.body}</div>
     <div class="po-cols">
       ${block(T('진료 때 말할 것'), c.notes.map((x) => esc(x)))}
       ${block(T('진료 · 약 변경 기록'), log.map((x) => `<small>${shortDate(x.date)} · ${kindName(x.kind)}</small>${esc(x.text || '')}`))}

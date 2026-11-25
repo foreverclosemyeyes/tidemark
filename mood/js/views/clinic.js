@@ -102,6 +102,14 @@ export function viewClinic() {
         <button class="mini" data-act="logAdd" data-kind="med">${T('+ 약 바꾼 날')}</button></div>
     </section>
 
+    <div class="sec">${T('요약 내보내기')}</div>
+    <div class="seg exp">${range(1, T('1주'))}${range(2, T('2주'))}${range(4, T('4주'))}${lastVisit() ? range('since', T('진료 후')) : ''}</div>
+    <div class="pair">
+      <button class="btn" data-act="printSummary">${T('PDF · 인쇄')}</button>
+      <button class="btn gray" data-act="copySummary">${T('글로 복사')}</button>
+    </div>
+    <p class="secnote" style="margin-top:10px">${T('PDF에는 흐름 그림과 위에 적은 것들이 한 장으로 들어가요. “PDF · 인쇄”를 누르면 아이폰 인쇄 화면이 뜨고, 미리보기를 두 손가락으로 벌린 뒤 공유 버튼을 누르면 저장하거나 보낼 수 있어요.')}</p>
+
     ${changes.map((ch) => `<div class="sec">${F('약을 바꾼 뒤 · {0}', md(parse(ch.date)))}</div>
     <section class="card tbl">${ch.text ? `<div class="tbl-t">${esc(ch.text)}</div>` : ''}${tr(['', T('앞 2주'), F('뒤 {0}일', ch.after)], true)}${ch.rows.map((r) => tr(r)).join('')}</section>`).join('')}
 
@@ -113,14 +121,9 @@ export function viewClinic() {
       ${state.notes.map((x) => `<div class="beyond">${x}</div>`).join('')}
       <p>${T('진단이 아니에요. 진료 때 보여 주며 이야기해 보세요.')}</p></section>` : ''}
 
-    <div class="sec">${T('요약 내보내기')}</div>
-    <section class="card list">
-      <div class="li"><span class="lk">${T('기간')}</span><div class="seg">${range(1, T('1주'))}${range(2, T('2주'))}${range(4, T('4주'))}${lastVisit() ? range('since', T('진료 후')) : ''}</div></div>
-      <button class="li add" data-act="printSummary">${IC.doc}&nbsp; ${T('PDF · 인쇄')}</button>
-      <button class="li add" data-act="copySummary">${IC.note}&nbsp; ${T('글로 복사')}</button>
-      <button class="li add" data-act="copyAi">${IC.spark}&nbsp; ${T('AI에게 물어볼 글 복사 (최근 4주)')}</button>
-    </section>
-    <p class="secnote">${T('PDF에는 흐름 그림과 위에 적은 것들이 한 장으로 들어가요. “PDF · 인쇄”를 누르면 아이폰 인쇄 화면이 뜨고, 미리보기를 두 손가락으로 벌린 뒤 공유 버튼을 누르면 저장하거나 보낼 수 있어요.')}
+    <div class="sec">${T('AI에게 물어보기')}</div>
+    <section class="card list"><button class="li add" data-act="copyAi">${IC.spark}&nbsp; ${T('AI에게 물어볼 글 복사 (최근 8주)')}</button></section>
+    <p class="secnote">${T('기록과 메모, 약, 생리를 통째로 읽고 풀이하는 것은 이 앱 안에서는 못 해요. 복사한 글을 Claude나 ChatGPT 같은 앱에 붙여 넣으면 전체를 읽고 정리해 줘요.')}
       ${T('AI용 글을 Claude나 ChatGPT 같은 앱에 붙여 넣는 순간 그 기록은 해당 AI 서비스로 전송돼요.')}</p>
     <p class="foot">${DISCLAIMER}</p>`;
 }

@@ -149,8 +149,14 @@ const actions = {
     if (el.dataset.v) closeSheet(); else redrawSettings();   // 처음 안내에서 골랐으면 안내를 닫는다
   },
   demo: () => { ui.demo = !ui.demo; render(); },
-  // 처음 화면의 "예시 보기": 흐름 화면을 예시 기록으로 연다 (예시가 12주치라 3달 보기로)
-  demoFlow: () => { ui.demo = true; ui.tab = 'trend'; trend.mode = 'quarter'; trend.anchor = today(); trend.pick = null; toTop(); render(); enterApp(); },
+  // 흐름의 선·띠를 하나씩 끄고 켠다 (꺼 둔 것은 설정에 남아서 다음에 열어도 그대로이고, PDF에도 안 나온다)
+  flowToggle: (el) => {
+    const k = el.dataset.k, off = db.settings.flowOff || [];
+    db.settings.flowOff = off.includes(k) ? off.filter((x) => x !== k) : [...off, k];
+    save(); render();
+  },
+  // 처음 화면의 "예시 보기": 흐름 화면을 예시 기록으로 연다 (예시가 26주치라 6달 보기로)
+  demoFlow: () => { ui.demo = true; ui.tab = 'trend'; trend.mode = 'half'; trend.anchor = today(); trend.pick = null; toTop(); render(); enterApp(); },
   // 설정: 기록 항목 켜고 끄기 (꺼진 항목의 열쇠를 settings.off에 모아 둔다)
   item: (el) => {
     const k = el.dataset.k, off = db.settings.off || [];
