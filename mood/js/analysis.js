@@ -281,21 +281,6 @@ export function moodNotes(entries = db.entries) {
   return { low: pick((e) => e.mood <= 4, 1), high: pick((e) => e.mood >= 7, -1) };
 }
 
-// ---------- 긴 흐름: 주마다의 기분 평균 (최근 1년) ----------
-// 조울의 주기는 몇 달씩 이어지기도 해서 (우울 반년, 들뜸 석 달 같은) 주·월 단위 그래프로는 안 보인다. 그래서 한 해를 한눈에 본다.
-// 이틀 이상 적은 주만 점으로 친다. 그런 주가 10주 이상일 때만 나온다. [{ start: 그 주 월요일, mood: 평균 또는 null }, …] (오래된 주부터) 또는 null
-export function longFlow(entries = db.entries) {
-  const t = today(), keys = Object.keys(entries).sort();
-  if (!keys.length) return null;
-  const mondayOf = (k) => addDays(k, -((parse(k).getDay() + 6) % 7));
-  const from = keys[0] > addDays(t, -363) ? mondayOf(keys[0]) : mondayOf(addDays(t, -357)), weeks = [];
-  for (let w = from; w <= t; w = addDays(w, 7)) {
-    const v = [0, 1, 2, 3, 4, 5, 6].map((i) => entries[addDays(w, i)]).filter((e) => e && e.mood != null).map((e) => e.mood);
-    weeks.push({ start: w, mood: v.length >= 2 ? avg(v) : null });
-  }
-  return weeks.filter((w) => w.mood != null).length >= 10 ? weeks : null;
-}
-
 // ---------- 약을 바꾼 앞뒤 ----------
 // 약을 바꾼 날(진료 화면에 적어 둔 것)의 앞 2주와 뒤 2주. 앞뒤로 각각 4일 이상 적었을 때만 나온다. (최근 것부터)
 // [{ date, text, after: 뒤쪽에 적은 날 수, rows: [[항목, 앞, 뒤], …] }]

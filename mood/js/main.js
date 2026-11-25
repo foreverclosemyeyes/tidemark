@@ -19,7 +19,7 @@ import { SLIDERS, cafHead, fxHtml, medsHtml, psychHtml, openRecord, saveEntry, s
 import { printoutHtml } from './views/printout.js';
 import { openWelcome } from './views/welcome.js';
 import { openSettings } from './views/settings.js';
-import { shiftAnchor, shiftTrend, trendRange } from './views/trend.js';
+import { canShift, shiftTrend, trendRange } from './views/trend.js';
 
 themeQuery.addEventListener('change', () => { applyTheme(); if (!sheetOpen()) render(); });
 
@@ -205,7 +205,7 @@ const actions = {
   size: (el) => { db.settings.size = el.dataset.size; save(); applyFont(); render(); openSettings(); },
   font: (el) => { db.settings.font = el.dataset.font; save(); applyFont(); openSettings(); },
   mode: (el) => { trend.mode = el.dataset.mode; trend.pick = null; if (trend.anchor > today()) trend.anchor = today(); render(); },
-  shift: (el) => { shiftTrend(Number(el.dataset.step)); render(); },
+  shift: (el) => { const step = Number(el.dataset.step); if (canShift(step)) { shiftTrend(step); render(); } },
   pickDay: (el) => { const i = Number(el.dataset.i); trend.pick = trend.pick === i ? null : i; render(); },
   openDay: (el) => { if (sheetOpen()) closeSheet(); ui.selected = el.dataset.date; ui.tab = 'today'; toTop(); render(); enterApp(); },
   notes: openNotes,
@@ -342,7 +342,7 @@ app.addEventListener('keydown', (ev) => {
 // 옆으로 밀면 날짜가 넘어간다: 오늘 탭은 하루씩, 흐름 탭은 한 주(한 달)씩. 미래로는 못 간다.
 onSwipe(app, {
   can: (step) => (ui.tab === 'today' ? addDays(ui.selected, step) <= today()
-    : ui.tab === 'trend' ? trendRange(shiftAnchor(trend.anchor, step)).start <= today() : false),
+    : ui.tab === 'trend' ? canShift(step) : false),
   go: (step) => {
     if (ui.tab === 'today') ui.selected = addDays(ui.selected, step); else shiftTrend(step);
     render();

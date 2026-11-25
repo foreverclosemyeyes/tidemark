@@ -420,7 +420,14 @@ function seed() {
   const insightText = made && await page.textContent('#app');
   check('생리 전후 표가 나옴 (전 5일의 기분이 낮게)', /생리 전후 · 최근 \d번/.test(insightText) && (await page.$$eval('.cols5 .tr', (els) => els.map((x) => x.textContent))).some((x) => /^기분[23]\.\d/.test(x)), insightText.slice(0, 400));
   check('약을 안 먹은 다음 날이 그 무렵 평소와 견주어 나옴', /약을 안 먹은 다음 날/.test(insightText) && /기분\d\.\d 낮음/.test(insightText));
-  check('긴 흐름 그림이 나옴', !!(await page.$('svg.flow-fig path')));
+  // 흐름의 년 보기: 한 해가 한 장에 (기분 선, 잠, 증상·약 띠가 같은 가로축에)
+  await page.click('[data-tab=trend]'); await page.click('[data-act=mode][data-mode=year]');
+  check('흐름에 년 보기가 있고 한 장에 선과 띠가 그려짐', (await page.$$('.year svg path')).length >= 2 && (await page.$$('.year .yrow')).length >= 4 && (await page.$$eval('.year .yrow svg >> nth=0 >> rect', (els) => els.length)) === 52);
+  check('년 보기에서 미래로는 못 넘김', await page.isDisabled('[data-act=shift][data-step="1"]'));
+  await page.click('[data-act=shift][data-step="-1"]');
+  check('이전으로 넘기면 석 달 앞의 한 해가 나오고 다시 앞으로 올 수 있음', !(await page.isDisabled('[data-act=shift][data-step="1"]')));
+  await page.click('[data-act=shift][data-step="1"]'); await page.click('[data-act=mode][data-mode=week]');
+  await page.click('[data-tab=insight]');
   check('기분이 낮았던 날의 메모가 나옴', /기분이 낮았던 날의 메모/.test(insightText) && insightText.includes('아무것도 하기 싫었음'));
   await page.click('[data-tab=today]');
   await openSet();

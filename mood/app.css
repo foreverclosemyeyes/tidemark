@@ -473,7 +473,12 @@ input[type=date] { border: 0; outline: none; background: var(--card2); color: va
 .tr span:first-child { color: var(--muted); }
 .tr span + span { font-family: var(--round); font-weight: 600; }
 .tbl.cols5 .tr { grid-template-columns: 1.15fr repeat(4, 1fr); grid-auto-flow: row; gap: 4px; }
-.flow-fig { display: block; overflow: visible; font-family: inherit; }
+/* 흐름의 년 보기: 선 그래프 아래로 띠들이 같은 가로축에 쌓인다 */
+.year svg { display: block; overflow: visible; font-family: inherit; }
+.ylegend { display: flex; gap: 14px; margin-bottom: 8px; color: var(--muted); font-size: calc(12px * var(--fs, 1.12)); }
+.ylegend i { display: inline-block; width: 16px; height: 2px; border-radius: 2px; background: var(--ink); vertical-align: middle; margin: -2px 6px 0 0; }
+.yrow { margin-top: 12px; }
+.yrow span { display: block; margin-bottom: 4px; font-size: calc(11.5px * var(--fs, 1.12)); color: var(--muted); }
 .tr.th span { font-family: inherit; font-weight: 500; color: var(--muted); font-size: calc(12px * var(--fs, 1.12)); }
 .tr small { display: block; color: var(--faint); font-weight: 400; }
 
