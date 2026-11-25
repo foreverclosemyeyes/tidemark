@@ -19,7 +19,7 @@ const tabsHtml = () => `<div class="settabs" role="tablist">${TABS().map(([key, 
   `<button type="button" role="tab" data-act="setTab" data-g="${key}" aria-selected="${ui.setTab === key}">${name}</button>`).join('')}</div>`;
 const group = (key, body) => `<div class="setpane" data-pane="${key}"${ui.setTab === key ? '' : ' hidden'}>${body}</div>`;
 
-// 화면 머리말 오른쪽의 설정 단추 (네 탭 모두에 있다)
+// 화면 머리말 오른쪽의 설정 단추 (모든 탭에 있다)
 export const settingsButton = () => `<button class="icon-btn" data-act="settings" aria-label="${T('설정과 백업')}">${IC.sliders}</button>`;
 
 export function openSettings() {

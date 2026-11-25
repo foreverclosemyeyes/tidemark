@@ -5,19 +5,17 @@ import { IC } from './icons.js';
 import { ui } from './state.js';
 import { careOn } from './store.js';
 import { viewClinic } from './views/clinic.js';
-import { viewInsight } from './views/insight.js';
 import { viewToday } from './views/today.js';
 import { viewTrend } from './views/trend.js';
 
 const TABS = [
   ['today', viewToday, () => IC.today, () => T('오늘')],
   ['trend', viewTrend, () => IC.chart, () => T('흐름')],
-  ['insight', viewInsight, () => IC.spark, () => T('인사이트')],
   ['clinic', viewClinic, () => IC.doc, () => T('진료')],
 ];
 
-// 병원·상담용 기능을 꺼 두면 인사이트·진료 탭은 없다
-const CARE_TABS = ['insight', 'clinic'];
+// 병원·상담용 기능을 꺼 두면 진료 탭은 없다
+const CARE_TABS = ['clinic'];
 
 export function render() {
   const tabs = TABS.filter(([key]) => careOn() || !CARE_TABS.includes(key));

@@ -149,8 +149,8 @@ const actions = {
     if (el.dataset.v) closeSheet(); else redrawSettings();   // 처음 안내에서 골랐으면 안내를 닫는다
   },
   demo: () => { ui.demo = !ui.demo; render(); },
-  // 처음 화면의 "예시 요약 보기": 진료 화면을 예시 기록으로 연다
-  demoClinic: () => { ui.demo = true; ui.tab = 'clinic'; toTop(); render(); enterApp(); },
+  // 처음 화면의 "예시 보기": 흐름 화면을 예시 기록으로 연다 (예시가 12주치라 3달 보기로)
+  demoFlow: () => { ui.demo = true; ui.tab = 'trend'; trend.mode = 'quarter'; trend.anchor = today(); trend.pick = null; toTop(); render(); enterApp(); },
   // 설정: 기록 항목 켜고 끄기 (꺼진 항목의 열쇠를 settings.off에 모아 둔다)
   item: (el) => {
     const k = el.dataset.k, off = db.settings.off || [];
@@ -186,11 +186,6 @@ const actions = {
     if (clinicView.weeks === 'since') clinicView.weeks = 2;
     save(); render();
   },
-  clinicLine: (el) => {
-    const k = el.dataset.k, on = clinicView.lines;
-    clinicView.lines = on.includes(k) ? on.filter((x) => x !== k) : [...on, k];
-    render();
-  },
   clinicNoteAdd: () => {
     const text = $('#c-note').value.trim();
     if (!text) return;
@@ -204,7 +199,15 @@ const actions = {
   lang: (el) => { db.settings.lang = el.dataset.lang; if (save()) location.reload(); },
   size: (el) => { db.settings.size = el.dataset.size; save(); applyFont(); render(); openSettings(); },
   font: (el) => { db.settings.font = el.dataset.font; save(); applyFont(); openSettings(); },
-  mode: (el) => { trend.mode = el.dataset.mode; trend.pick = null; if (trend.anchor > today()) trend.anchor = today(); render(); },
+  // 흐름의 보기 바꾸기 (주 / 월 / 3달 / 년). 보던 기간에 오늘이 들어 있었으면 새 보기에서도 오늘이 든 기간을 보여 준다
+  // (월 보기의 기준 날짜는 그 달 1일이라, 그대로 주 보기로 바꾸면 1일이 든 주가 나와 이번 주가 안 보인다).
+  mode: (el) => {
+    const r = trendRange(trend.anchor), hadToday = r.start <= today() && addDays(r.start, r.n - 1) >= today();
+    trend.mode = el.dataset.mode;
+    trend.pick = null;
+    if (hadToday || trend.anchor > today()) trend.anchor = today();
+    render();
+  },
   shift: (el) => { const step = Number(el.dataset.step); if (canShift(step)) { shiftTrend(step); render(); } },
   pickDay: (el) => { const i = Number(el.dataset.i); trend.pick = trend.pick === i ? null : i; render(); },
   openDay: (el) => { if (sheetOpen()) closeSheet(); ui.selected = el.dataset.date; ui.tab = 'today'; toTop(); render(); enterApp(); },

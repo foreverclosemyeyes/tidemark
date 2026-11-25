@@ -33,8 +33,8 @@ export function viewToday() {
 
   // 기록이 하나도 없을 때만: 이 앱이 무엇에 쓰는 것인지 한 줄과, 예시 요약으로 가는 단추
   const intro = !careOn() || Object.keys(db.entries).length ? '' : `<section class="card intro"><b>${T('매일 10초 적어 두면, 진료 날 한 장으로 보여 드려요.')}</b>
-      <p>${T('기분 · 잠 · 약을 적어 두면 지난 몇 주가 그래프와 한 장짜리 요약으로 정리돼요. “그동안 어땠어요?”에 기억 대신 기록으로 답할 수 있어요.')}</p>
-      <button class="mini" data-act="demoClinic">${T('예시 요약 보기')}</button></section>`;
+      <p>${T('기분 · 잠 · 약을 적어 두면 지난 몇 주, 몇 달이 한 장으로 정리돼요. “그동안 어땠어요?”에 기억 대신 기록으로 답할 수 있어요.')}</p>
+      <button class="mini" data-act="demoFlow">${T('예시 보기')}</button></section>`;
 
   const since = daysSinceBackup();
   const backup = backupDue()

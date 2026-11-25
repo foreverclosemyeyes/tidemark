@@ -203,30 +203,41 @@ function seed() {
   await page.click('#app [data-act=doseTime]');
   check('또 누르면 시각이 다시 들어감', /^\d\d:\d\d$/.test((await store()).taken[today][0].at));
 
-  // 5. 쌓인 기록: 신호 · 인사이트 · 흐름
-  await page.click('[data-tab=insight]');
+  // 5. 쌓인 기록: 흐름 한 장 · 진료
+  check('아래 탭은 오늘 · 흐름 · 진료 세 개 (인사이트 탭은 없음)', (await page.$$eval('.tabbar button', (els) => els.map((x) => x.dataset.tab).join())) === 'today,trend,clinic');
+  await page.click('[data-tab=trend]');
   const mineBefore = JSON.stringify((await store()).entries);
   await page.click('[data-act=demo]');
-  check('기록이 적을 때 예시로 인사이트를 미리 봄 (내 기록은 그대로)', (await page.$$('.state li')).length >= 2 && (await text('#app')).includes('예시 기록') && JSON.stringify((await store()).entries) === mineBefore);
+  check('기록이 적을 때 예시로 흐름을 미리 봄 (내 기록은 그대로)', (await page.$$('.flow svg path')).length >= 2 && (await text('#app')).includes('예시 기록') && JSON.stringify((await store()).entries) === mineBefore);
   await page.click('[data-act=demo]');
-  check('예시를 닫으면 원래 안내로 돌아옴', (await page.$$('.state')).length === 0 && (await text('#app')).includes('4일 이상 적으면'));
+  check('예시를 닫으면 내 흐름으로 돌아옴', !(await text('#app')).includes('예시 기록') && !!(await page.$('[data-act=demo]')));
   await page.click('[data-tab=today]');
   await put(seed());
   check('오늘 화면에는 인사이트 배너를 띄우지 않음', (await page.$$('#app .signal')).length === 0);
-  await page.click('[data-tab=insight]');
-  check('인사이트는 짧게: 시기 목록·비교 목록은 없고 근거는 여섯 줄까지', !(await text('#app')).includes('지금까지의 시기') && (await page.$$('.li.cmp')).length === 0 && (await page.$$('.state li')).length <= 6);
+  await page.click('[data-tab=clinic]');
+  check('최근 7일 읽기는 진료 화면에 짧게: 근거는 여섯 줄까지', (await page.$$('.state')).length === 1 && (await page.$$('.state li')).length <= 6);
   // 잠자는 시간대가 당겨진 기록을 넣으면 그 점을 짚어 준다 (최근 연구 반영)
   await page.evaluate(([k]) => { const d = JSON.parse(localStorage.getItem(k)); Object.keys(d.entries).sort().reverse().forEach((date, i) => { d.entries[date].bed = i < 5 ? '22:00' : '01:00'; }); localStorage.setItem(k, JSON.stringify(d)); }, [KEY]);
-  await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=insight]');
+  await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=clinic]');
   check('최근 7일 읽기: 잠자는 시간대가 당겨진 것을 짚어 줌', (await text('.state')).includes('잠자는 시간대가 평소보다') && (await text('.state')).includes('당겨짐'));
   check('최근 7일 읽기: 언제부터 며칠째인지도 말함',(await text('.state .flow')).includes('일째') && (await text('.state .flow')).includes('경조증 기준 기간(4일)을 넘음'));
   check('최근 7일 읽기: 들뜬 날이 이어지면 겹치는 점을 근거와 함께 보여 줌', (await text('.state')).includes('경조증·조증 때의 모습과 많이 겹쳐요') && (await text('.state')).includes('경조증 기준 증상 7가지 중') && (await text('.state')).includes('진단이 아니에요'));
   await page.click('[data-tab=trend]');
-  check('주 그래프', (await page.$$('.plot svg')).length >= 4);
+  check('주 흐름: 한 장에 기분·에너지 선, 잠, 띠가 같은 가로축에 (항목마다 따로 있던 카드는 없음)', (await page.$$('#app .flow')).length === 1 && (await page.$$('.flow svg.flow-chart path')).length === 2
+    && (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 7 && (await text('.flow')).includes('스트레스') && !(await page.$('.mcard')));
+  check('약은 띠로 그리지 않음', !(await text('.flow')).includes('브린텔릭스'));
+  check('흐름 그림이 카드 밖으로 안 넘침', await page.evaluate(() => [...document.querySelectorAll('.flow svg')].every((el) => el.getBoundingClientRect().right <= el.closest('.card').getBoundingClientRect().right + 0.5)));
   await page.click('[data-mode=month]');
-  check('월 달력', (await page.$$('.cal .cday')).length >= 28);
-  await page.click('.cal .cday:not([disabled])');
-  check('날짜를 누르면 그날 표시', await page.isVisible('.pickbar'));
+  check('월 흐름: 하루가 한 칸', [28, 29, 30, 31].includes(await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)));
+  const box = await page.$eval('.flow svg.flow-chart', (x) => { const r = x.getBoundingClientRect(); return [r.left, r.top]; });
+  await page.mouse.click(box[0] + 4, box[1] + 30);
+  check('날짜를 누르면 그날 값이 뜸', await page.isVisible('.pickbar') && /기분 \d/.test(await text('.pickbar')));
+  await page.click('[data-mode=quarter]');
+  check('3달 흐름: 13주가 하루 한 칸씩', (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 91 && await page.isDisabled('[data-act=shift][data-step="1"]'));
+  await page.click('[data-mode=month]');
+  await page.click('[data-mode=week]');
+  check('보기를 바꿔도 오늘이 든 기간을 보여 줌 (월 → 주)', await page.isDisabled('[data-act=shift][data-step="1"]'));
+  await page.click('[data-mode=month]');
 
   // 5-1. 옆으로 밀어서 날짜 넘기기
   const swipe = async (dx) => { await page.evaluate((d) => {
@@ -249,24 +260,13 @@ function seed() {
 
   // 5-2. 진료 탭: 다음 진료일, 말할 것, 요약
   await page.click('[data-tab=clinic]');
-  check('진료용 요약에 그림과 눈에 띄는 날, 약이 나옴', (await page.$$('.sum-rows circle, .sum-rows path')).length === 0 && (await page.$$('.sum-fig path')).length === 2 && (await page.$$('.sum-rows rect')).length % 14 === 0 && (await page.$$('.sum-rows rect[style]')).length > 0
-    && (await text('.sum-rows')).includes('스트레스') && !(await text('.sum-rows')).includes('우울') && (await text('.sum-rows')).includes('브린텔릭스') && (await text('#summary')).includes('5시간 미만'));
-  const confOff = !(await text('.sum-fig')).includes('자신감');
-  await page.click('.sum-tog[data-k=conf]');
-  check('큰 그래프에서 선을 켜고 끔 (선은 기분·에너지·자신감 세 가지뿐)', confOff && (await text('.sum-fig')).includes('자신감') && (await page.getAttribute('.sum-tog[data-k=conf]', 'aria-pressed')) === 'true' && (await page.$$('.sum-tog')).length === 3);
-  await page.click('.sum-tog[data-k=conf]');
-  check('요약 그림이 카드 밖으로 안 넘침', await page.evaluate(() => [...document.querySelectorAll('#summary .card svg')].every((el) => el.getBoundingClientRect().right <= el.closest('.card').getBoundingClientRect().right)));
+  check('진료 화면에는 그래프가 없고 들고 갈 것들만 있음', !(await page.$('#app svg.flow-chart')) && !!(await page.$('#c-next')) && !!(await page.$('#c-note')) && !!(await page.$('[data-act=printSummary]')) && !!(await page.$('[data-act=copyAi]')));
   await page.fill('#c-note', '약 먹으면 오후에 졸림'); await page.press('#c-note', 'Enter');
-  check('말할 것 추가 (엔터)', (await store()).clinic.notes[0] === '약 먹으면 오후에 졸림' && (await text('#summary')).includes('약 먹으면 오후에 졸림'));
+  check('말할 것 추가 (엔터)', (await store()).clinic.notes[0] === '약 먹으면 오후에 졸림' && (await text('#talk')).includes('약 먹으면 오후에 졸림'));
   await page.fill('#c-next', dayAgo(-3));
   check('다음 진료일까지 남은 날', (await text('.top .over')) === '진료까지 3일' && (await store()).clinic.next === dayAgo(-3));
   await page.click('[data-act=clinicWeeks][data-w="4"]');
-  check('4주 요약', (await text('#summary')).includes('/ 28일'));
-  check('4주 요약: 그래프와 네모 줄이 기간 전체로 한 장씩, 네모는 한 줄에 28칸이고 글자 없이 색만', (await page.$$('.sum-fig')).length === 1 && (await page.$$('.sum-rows')).length === 1
-    && (await page.$$('.sum-rows rect')).length % 28 === 0 && (await page.$$('.sum-rows text[text-anchor=middle]')).length === 0);
-  await page.click('[data-act=clinicWeeks][data-w="1"]');
-  check('1주 요약: 요일이 적힌 네모가 날마다 한 칸', (await text('#summary')).includes('/ 7일') && (await page.$$('.sum-rows rect')).length % 7 === 0 && (await page.$$('.sum-rows rect + text')).length > 0);
-  await page.click('[data-act=clinicWeeks][data-w="4"]');
+  check('내보낼 기간을 고름 (4주)', (await page.getAttribute('[data-act=clinicWeeks][data-w="4"]', 'aria-pressed')) === 'true');
   await page.click('[data-act=copySummary]');
   check('요약을 글로 복사', await page.waitForFunction(() => document.querySelector('#toast').textContent === '복사했어요', null, { timeout: 3000 }).then(() => true, () => false));
   await page.click('[data-act=clinicNoteDel]');
@@ -277,13 +277,18 @@ function seed() {
   await page.click('[data-act=logAdd][data-kind=med]');
   await page.fill('#l-text', '브린텔릭스 10mg → 15mg');
   await page.click('[data-act=logSave]');
-  check('약 바꾼 날이 기록되고 그래프에 표시됨', (await store()).clinic.log[0].kind === 'med' && (await text('.sum-fig')).includes('약 변경') && (await text('#summary')).includes('10mg → 15mg'));
+  check('약 바꾼 날이 기록됨', (await store()).clinic.log[0].kind === 'med' && (await text('#log')).includes('10mg → 15mg'));
+  await page.click('[data-tab=trend]'); await page.click('[data-mode=week]');
+  check('약 바꾼 날이 흐름 그래프에 세로선으로 표시됨', (await text('.ylegend')).includes('약 변경') && (await page.$$('.flow svg.flow-chart line[stroke-opacity="0.8"]')).length === 1);
+  await page.click('[data-tab=clinic]');
   check('진료 메모가 없으면 "진료 후" 단추가 없음', (await page.$$('[data-act=clinicWeeks][data-w=since]')).length === 0);
   await page.click('[data-act=logAdd][data-kind=visit]');
   await page.fill('#l-date', dayAgo(9)); await page.fill('#l-text', '2주 뒤에 다시');
   await page.click('[data-act=logSave]');
   await page.click('[data-act=clinicWeeks][data-w=since]');
-  check('"진료 후"는 지난 진료일이 들어가는 주 단위 (9일 전 → 2주)', (await text('#summary')).includes('/ 14일') && (await store()).clinic.log[0].kind === 'visit');
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  check('"진료 후"는 지난 진료일이 들어가는 주 단위 (9일 전 → 2주)', (await page.textContent('#printout .po-head')).includes('/ 14일') && (await store()).clinic.log[0].kind === 'visit');
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
   await page.click('[data-tab=today]'); await openSet();
   await page.fill('#cu-name', '술'); await page.click('[data-act=customAdd]');
   await page.fill('#cu-name', '걸음 수'); await page.click('[data-act=customType][data-t=number]'); await page.fill('#cu-unit', '보'); await page.click('[data-act=customAdd]');
@@ -298,8 +303,11 @@ function seed() {
   e = (await store()).entries[today];
   check('내 항목(했음, 숫자와 단위)이 저장되고 오늘 화면에 보임', e.custom[cu1] === true && e.custom[cu2] === 7500 && (await text('#app')).includes('7500 보'));
   check('부작용과 정신병적 증상이 저장되고 오늘 화면에 보임', e.psych.voices === true && e.psy === 2 && (await text('#app')).includes('환청 · 현실 같지 않음') && e.fx.sleepy === true && e.fx['c:발진'] === true && (await store()).settings.fxCustom[0] === '발진' && (await text('#app')).includes('졸림 · 발진'));
-  await page.click('[data-tab=clinic]');
-  check('진료 화면에 부작용과 내 항목이 네모 줄로 나옴', (await text('#summary')).includes('부작용') && (await page.$$eval('.sum-rows', (x) => x.map((el) => el.textContent).join(' '))).includes('걸음 수'));
+  await page.click('[data-tab=trend]');
+  check('흐름에 내 항목과 정신병적 증상이 띠로 나옴', (await text('.flow')).includes('걸음 수') && (await text('.flow')).includes('정신병적 증상'));
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  check('종이용 요약에 부작용이 글로 들어감', (await page.textContent('#printout')).includes('부작용') && (await page.textContent('#printout')).includes('졸림'));
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
 
   // 5-2-1. 설정에서 기록 항목 끄기: 화면에서만 빠지고 적어 둔 값은 남는다
   await page.click('[data-tab=today]'); await openSet();
@@ -398,44 +406,31 @@ function seed() {
   await page.click('[data-act=pinOff]');
   check('잠금 끄기', !(await store()).settings.pin);
 
-  // 9. 숫자로 보기: 최근 7일과 그 전 4주가 표로 나오고, 진단명 설정은 없다
+  // 9. 흐름의 년 보기: 한 해가 한 장에. 진단명 설정은 없다.
   await page.click('[data-act=close]');
   await put(seed());
-  await page.click('[data-tab=insight]');
-  check('인사이트에 숫자 표(며칠 중 며칠)는 없음', !(await page.$('.nums')));
-  // 생리 전후 · 약을 안 먹은 다음 날 · 긴 흐름 · 기분이 낮았던 날의 메모
-  const made = await page.evaluate(() => {
+  await page.evaluate(() => {
     const pad = (n) => String(n).padStart(2, '0'), day = (i) => { const d = new Date(); d.setDate(d.getDate() - i); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
     const d = JSON.parse(localStorage.getItem('tide.v1')), med = { name: '브린텔릭스', dose: '10mg' };
     d.entries = {}; d.meds = [med]; d.taken = {};
-    for (let i = 119; i >= 0; i--) {
-      const phase = (119 - i + 6) % 28, period = phase < 5, pre = phase >= 23, missed = i % 9 === 4, afterMissed = (i + 1) % 9 === 4;
-      d.entries[day(i)] = { date: day(i), mood: (pre ? 3 : 6) - (afterMissed ? 2 : 0), energy: (pre ? 4 : 6) - (afterMissed ? 2 : 0), conf: 5, dep: pre ? 3 : 1, anx: pre ? 2 : 1, si: 0, sleepMin: 430, period,
-        meds: missed ? [] : [med], signs: {}, note: i === 3 ? '아무것도 하기 싫었음' : '' };
-    }
+    for (let i = 119; i >= 0; i--) d.entries[day(i)] = { date: day(i), mood: i > 60 ? 3 : 7, energy: 5, conf: 5, stress: 2, anx: 1, si: 0, sleepMin: 430, period: i % 28 < 5, meds: i % 9 === 4 ? [] : [med], signs: {}, note: '' };
     localStorage.setItem('tide.v1', JSON.stringify(d));
-    return true;
   });
-  await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=insight]');
-  const insightText = made && await page.textContent('#app');
-  check('생리 전후 표가 나옴 (전 5일의 기분이 낮게)', /생리 전후 · 최근 \d번/.test(insightText) && (await page.$$eval('.cols5 .tr', (els) => els.map((x) => x.textContent))).some((x) => /^기분[23]\.\d/.test(x)), insightText.slice(0, 400));
-  check('약을 안 먹은 다음 날이 그 무렵 평소와 견주어 나옴', /약을 안 먹은 다음 날/.test(insightText) && /기분\d\.\d 낮음/.test(insightText));
-  // 흐름의 년 보기: 한 해가 한 장에 (기분 선, 잠, 증상·약 띠가 같은 가로축에)
+  await page.reload(); await page.waitForSelector('h1');
   await page.click('[data-tab=trend]'); await page.click('[data-act=mode][data-mode=year]');
-  check('흐름에 년 보기가 있고 한 장에 선과 띠가 그려짐', (await page.$$('.year svg path')).length >= 2 && (await page.$$('.year .yrow')).length >= 4 && (await page.$$eval('.year .yrow svg >> nth=0 >> rect', (els) => els.length)) === 52);
+  check('년 보기: 한 칸이 한 주이고 선과 띠가 한 장에 그려짐', (await page.$$('.flow svg.flow-chart path')).length === 2 && (await page.$$('.flow .yrow')).length >= 4 && (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 52);
+  check('약은 안 먹은 주만 그래프 아래 점으로', (await page.$$('.flow svg.flow-chart circle')).length >= 5 && (await text('.ylegend')).includes('약 안 먹은 날') && !(await text('.flow')).includes('브린텔릭스'));
   check('년 보기에서 미래로는 못 넘김', await page.isDisabled('[data-act=shift][data-step="1"]'));
   await page.click('[data-act=shift][data-step="-1"]');
   check('이전으로 넘기면 석 달 앞의 한 해가 나오고 다시 앞으로 올 수 있음', !(await page.isDisabled('[data-act=shift][data-step="1"]')));
   await page.click('[data-act=shift][data-step="1"]'); await page.click('[data-act=mode][data-mode=week]');
-  await page.click('[data-tab=insight]');
-  check('기분이 낮았던 날의 메모가 나옴', /기분이 낮았던 날의 메모/.test(insightText) && insightText.includes('아무것도 하기 싫었음'));
   await page.click('[data-tab=today]');
   await openSet();
   check('설정에 진단명이 없음', !(await page.$('#sheet [data-act=dx]')) && !/진단명/.test(await page.textContent('#sheet')));
   await page.click('[data-act=close]'); await page.waitForTimeout(300);
-  // 설정은 가로 탭으로 나뉘어 있고, 고른 탭의 내용만 보인다. 흐름·인사이트·진료 화면에서도 설정을 열 수 있다.
+  // 설정은 가로 탭으로 나뉘어 있고, 고른 탭의 내용만 보인다. 흐름·진료 화면에서도 설정을 열 수 있다.
   await page.evaluate(() => { const st = document.querySelector('#test-allpanes'); if (st) st.remove(); });
-  for (const tab of ['trend', 'insight', 'clinic']) {
+  for (const tab of ['trend', 'clinic']) {
     await page.click(`[data-tab=${tab}]`);
     await page.click('#app .top [data-act=settings]');
     check(`${tab} 화면에서도 설정이 열림`, (await page.$$('#sheet .settabs button')).length === 5);
@@ -461,16 +456,6 @@ function seed() {
   check('안 적은 날에 공황 줄을 누르면 바로 한 번이 적힘', (await panicOf()) === 1 && !(await page.$('[data-act=panicAdd]')));
   await page.click('.li[data-focus=panic]'); await page.click('[data-panic="1"]'); await page.click('#sheet [data-act=save]');
   check('공황 줄을 눌러 횟수를 고침', (await panicOf()) === 2);
-  // 진료 요약: 요일 글자는 네모가 큰 1주에서만 네모 안에 적는다
-  await put(seed());
-  await page.click('[data-tab=clinic]');
-  const letters = async () => (await page.$$eval('#summary .sum-rows text', (els) => els.filter((x) => /^[SMTWF]$/.test(x.textContent)).length));
-  await page.click('[data-act=clinicWeeks][data-w="1"]');
-  const one = await letters();
-  await page.click('[data-act=clinicWeeks][data-w="2"]');
-  check('요일 글자는 1주 네모에만 있고 2주 네모에는 없음', one > 0 && (await letters()) === 0, one);
-  await page.click('[data-tab=today]');
-
   // 진료 기록의 긴 글: 날짜가 글 옆에서 밀려 꺾이지 않고 글 위에 한 줄로 있다
   await page.evaluate((k) => { const d = JSON.parse(localStorage.getItem(k)); d.clinic = { notes: [], ...d.clinic, log: [{ date: '2026-11-14', kind: 'visit', text: '긴 진료 메모 '.repeat(12) }] }; localStorage.setItem(k, JSON.stringify(d)); }, KEY);
   await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=clinic]');
@@ -481,7 +466,7 @@ function seed() {
   // 인쇄용 한 장: 종이 크기에 맞춘 배치가 따로 채워지고, 화면에서는 안 보인다
   await page.click('[data-tab=clinic]');
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
-  check('인쇄할 때 종이용 한 장이 채워짐 (머리말 · 숫자 칸 · 그림)', (await page.$$('#printout .po-stat')).length === 4 && !!(await page.$('#printout .po-head h1')) && !!(await page.$('#printout svg.sum-rows')));
+  check('인쇄할 때 종이용 한 장이 채워짐 (머리말 · 숫자 칸 · 그림)', (await page.$$('#printout .po-stat')).length === 4 && !!(await page.$('#printout .po-head h1')) && !!(await page.$('#printout svg.flow-chart')) && (await page.$$eval('#printout svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 14);
   check('종이용 한 장은 화면에서는 안 보임', await page.$eval('#printout', (x) => getComputedStyle(x).display === 'none'));
   await page.emulateMedia({ media: 'print' });
   check('인쇄에서는 종이용 한 장만 보임', await page.evaluate(() => getComputedStyle(document.querySelector('#printout')).display === 'block' && getComputedStyle(document.querySelector('#app')).display === 'none'));
@@ -506,14 +491,15 @@ function seed() {
   check('설정에서 병원 · 상담용 기능이 꺼져 있음', (await page.getAttribute('#sheet [data-act=care]', 'aria-pressed')) === 'false');
   await page.click('#sheet [data-act=care]');
   mode = (await store()).settings;
-  check('설정에서 다시 켜면 항목과 탭이 돌아옴', mode.care === true && !mode.off.includes('anx') && (await page.$$('.tabbar button')).length === 4);
+  check('설정에서 다시 켜면 항목과 탭이 돌아옴', mode.care === true && !mode.off.includes('anx') && (await page.$$('.tabbar button')).length === 3);
   await page.click('[data-act=close]');
-  check('병원 · 상담용으로 쓰면 기록이 없을 때 소개가 보임', !!(await page.$('.intro [data-act=demoClinic]')));
-  await page.click('[data-act=demoClinic]');
-  check('"예시 요약 보기"를 누르면 진료 화면이 예시 기록으로 열림', (await page.$$('#summary .sum-fig path')).length >= 2 && !!(await page.$('#summary svg.sum-rows')) && !(await page.$('#c-note')) && !(await page.$('[data-act=logAdd]')));
+  check('병원 · 상담용으로 쓰면 기록이 없을 때 소개가 보임', !!(await page.$('.intro [data-act=demoFlow]')));
+  await page.click('[data-act=demoFlow]');
+  check('"예시 보기"를 누르면 흐름 화면이 예시 기록으로 열림 (3달 보기)', (await page.$$('.flow svg.flow-chart path')).length === 2 && (await page.getAttribute('[data-mode=quarter]', 'aria-pressed')) === 'true' && (await text('.ylegend')).includes('약 변경'));
   check('예시는 저장되지 않음', Object.keys((await store()).entries).length === 0 && ((await store()).clinic.log || []).length === 0);
   await page.click('[data-act=demo]');
-  check('예시를 닫으면 내 진료 화면으로 돌아옴', !!(await page.$('#c-note')) && !!(await page.$('#c-next')));
+  check('예시를 닫으면 내 흐름으로 돌아옴', !(await text('#app')).includes('예시 기록'));
+  await page.click('[data-mode=week]'); await page.click('[data-tab=today]');
   await put(kept);
   check('기록이 있으면 소개와 예시 단추가 안 보임', !(await page.$('.intro')) && !(await page.$('[data-act=demo]')));
 
