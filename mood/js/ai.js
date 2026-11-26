@@ -10,13 +10,17 @@ import { T } from './i18n.js';
 const URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-opus-5-5';
 const DAYS = 182;   // 보내는 기록: 최근 26주 (몇 달씩 가는 흐름을 읽게)
+// 최신 자료 확인: 풀이를 쓰기 전에 AI가 웹에서 진료 지침과 연구를 찾아보게 한다 (정신과 자료는 시의성이 중요하다고 사용자가 요청, 2026-11-26).
+// 검색 한 번마다 돈이 들어서 횟수를 묶어 둔다. 검색어에는 기록 내용을 넣지 않게 지시문에 적어 두었다.
+const SEARCH = { type: 'web_search_20260209', name: 'web_search', max_uses: 6 };
+const MAX_RESUME = 3;   // 서버가 검색하다 멈추고 돌려주면(pause_turn) 이어서 부르는 횟수
 
 const read = (k) => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
 export const aiKey = () => read(AI_KEY);
 export function setAiKey(key) {
   if (key) localStorage.setItem(AI_KEY, key); else { localStorage.removeItem(AI_KEY); localStorage.removeItem(AI_OUT); }
 }
-// 마지막으로 받은 풀이: { date, text, cut(길어서 잘렸는지) } 또는 null
+// 마지막으로 받은 풀이: { date, text, cut(길어서 잘렸는지), sources: [{ url, title }] (AI가 근거로 단 웹 자료), searched(웹 검색을 했는지) } 또는 null
 export const aiResult = () => { try { return JSON.parse(read(AI_OUT)) || null; } catch (e) { return null; } };
 
 // 풀이를 맡기는 말. 정신과 전문의 수준으로 깊게 읽되, 기록만으로 진단을 내리지는 않게 한다 (이 앱은 진단 도구가 아니다).
@@ -32,7 +36,10 @@ const SYSTEM = `당신은 기분장애·불안장애·정신병적 장애·성�
 쓰는 방법
 - 쉬운 한국어로, 본인에게 말하듯 차분하게 씁니다. 전문 용어를 쓰면 바로 풀어 줍니다. 겁주는 표현을 쓰지 않습니다.
 - 자기 기록만으로는 진단을 내릴 수 없습니다. "○○입니다"라고 단정하지 말고, 임상적으로 어떤 가능성들을 견주어 볼 만한지, 각각을 뒷받침하는 기록과 맞지 않는 기록이 무엇인지, 가르려면 무엇을 더 확인해야 하는지를 전문가답게 구체적으로 씁니다. 진단 기준의 어느 항목과 닿는지도 말합니다.
-- 연구나 지침은 확실히 아는 것만 말합니다. 논문 제목·저자·연도·수치를 지어내지 않습니다. 확실하지 않으면 "연구에서 알려진 바로는" 정도로만 씁니다.
+- 풀이를 쓰기 전에 web_search 도구로, 이 기록에서 중요해 보이는 주제의 최신 근거를 확인합니다. 공신력 있는 곳만 씁니다: 진료 지침(APA, NICE, CANMAT·ISBD, WFSBP, 대한신경정신의학회 등), 체계적 문헌고찰·메타분석(Cochrane 등), 주요 학술지의 동료 심사 논문, WHO·NIMH 같은 공공 기관. 최근 5년 안의 자료를 먼저 보고, 블로그·뉴스·상업 사이트·위키는 근거로 쓰지 않습니다.
+- 검색어에는 일반적인 주제어만 씁니다. 이 사람의 메모 문장이나 날짜, 개인 사정은 검색어에 넣지 않습니다.
+- 연구나 지침을 근거로 말할 때는 검색으로 확인한 것에 한해 출처를 달고, 그 자료가 나온 해를 같이 적습니다. 논문 제목·저자·연도·수치를 지어내지 않습니다. 확인하지 못한 것은 "확인하지 못했다"고 쓰거나, 일반적으로 알려진 내용이라고만 밝힙니다.
+- 검색 도구를 쓸 수 없으면 아는 범위에서 쓰되, 최신 자료를 확인하지 못했다고 "한눈에"에 한 줄로 밝힙니다.
 - 약의 용량을 바꾸라거나 끊으라고 하지 않습니다. 약과 관련해 눈에 띄는 점은 의사와 상의할 내용으로 적습니다.
 - 죽고 싶은 생각이 높게 적힌 날이 있으면 가볍게 넘기지 말고 담담하게 짚고, 한국의 자살예방상담전화 109(24시간)를 한 번 알려 줍니다.
 
@@ -43,7 +50,8 @@ const SYSTEM = `당신은 기분장애·불안장애·정신병적 장애·성�
 ## 메모에서 읽히는 것
 ## 눈여겨볼 날
 ## 견주어 볼 가능성
-## 진료 때 말하거나 물어볼 것`;
+## 진료 때 말하거나 물어볼 것
+## 확인한 근거 (어느 기관·학술지의 몇 년 자료인지와, 그것이 이 기록의 무엇과 닿는지 한 줄씩)`;
 
 // 서버가 돌려준 오류를 쉬운 말로
 function problem(status, message) {
@@ -56,11 +64,10 @@ function problem(status, message) {
   return `${T('분석을 받지 못했어요.')} (${status})`;
 }
 
-// 기록을 보내고 풀이를 받아 저장한다. 잘 되면 { ok: true }, 아니면 { ok: false, error: 보여 줄 말 }
-export async function askAi() {
-  let res;
+// Messages API를 한 번 부른다. 돌려주는 것: { status, data(JSON 또는 null) }. 연결이 안 되면 null.
+async function call(messages, search) {
   try {
-    res = await fetch(URL, {
+    const res = await fetch(URL, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -75,18 +82,46 @@ export async function askAi() {
         output_config: { effort: 'high' },
         fallbacks: 'default',   // 안전 분류기가 요청을 거절하면 서버가 다른 모델로 같은 요청을 다시 돌린다
         system: SYSTEM,
-        messages: [{ role: 'user', content: `오늘은 ${today()}입니다. 아래가 제 기록입니다. 전체를 읽고 풀이해 주세요.\n\n${recordText(DAYS)}` }],
+        ...(search ? { tools: [SEARCH] } : {}),
+        messages,
       }),
     });
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* 부른 쪽에서 상태 코드로 알린다 */ }
+    return { status: res.status, ok: res.ok, data };
   } catch (e) {
-    return { ok: false, error: T('연결하지 못했어요. 인터넷을 확인하고, 분석하는 동안에는 앱을 열어 두세요.') };
+    return null;
   }
-  let data = null;
-  try { data = await res.json(); } catch (e) { /* 아래에서 상태 코드로 알린다 */ }
-  if (!res.ok || !data) return { ok: false, error: problem(res.status, (data && data.error && data.error.message) || '') };
+}
+
+// 기록을 보내고 풀이를 받아 저장한다. 잘 되면 { ok: true }, 아니면 { ok: false, error: 보여 줄 말 }
+export async function askAi() {
+  const messages = [{ role: 'user', content: `오늘은 ${today()}입니다. 아래가 제 기록입니다. 전체를 읽고 풀이해 주세요.\n\n${recordText(DAYS)}` }];
+  const offline = { ok: false, error: T('연결하지 못했어요. 인터넷을 확인하고, 분석하는 동안에는 앱을 열어 두세요.') };
+  let search = true, r = await call(messages, search);
+  if (!r) return offline;
+  // 이 계정에서 웹 검색을 못 쓰면(조직 설정에서 꺼져 있는 등) 검색 없이 한 번 더 부른다
+  if (!r.ok && /web.?search/i.test((r.data && r.data.error && r.data.error.message) || '')) {
+    search = false;
+    r = await call(messages, search);
+    if (!r) return offline;
+  }
+  // 검색하다 멈추고 돌려준 경우: 받은 것을 그대로 붙여 다시 보내면 서버가 이어서 한다. 풀이 글은 여러 번에 걸쳐 올 수 있어 모아 둔다.
+  const blocks = [];
+  for (let i = 0; r.ok && r.data && r.data.stop_reason === 'pause_turn' && i < MAX_RESUME; i++) {
+    blocks.push(...r.data.content);
+    r = await call([messages[0], { role: 'assistant', content: blocks }], search);
+    if (!r) return offline;
+  }
+  const data = r.data;
+  if (!r.ok || !data) return { ok: false, error: problem(r.status, (data && data.error && data.error.message) || '') };
   if (data.stop_reason === 'refusal') return { ok: false, error: T('AI가 이번 요청에는 답하지 않았어요.') };
-  const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+  blocks.push(...(data.content || []));
+  // 출처가 달린 글은 여러 조각으로 나뉘어 오므로 그대로 이어 붙인다 (조각 사이에 줄을 넣으면 문장이 끊긴다)
+  const texts = blocks.filter((b) => b.type === 'text'), text = texts.map((b) => b.text).join('').trim();
   if (!text) return { ok: false, error: T('분석을 받지 못했어요.') };
-  localStorage.setItem(AI_OUT, JSON.stringify({ date: today(), text, cut: data.stop_reason === 'max_tokens' }));
+  const sources = [];
+  texts.forEach((b) => (b.citations || []).forEach((c) => { if (/^https?:\/\//.test(c.url || '') && !sources.some((x) => x.url === c.url)) sources.push({ url: c.url, title: c.title || c.url }); }));
+  localStorage.setItem(AI_OUT, JSON.stringify({ date: today(), text, cut: data.stop_reason === 'max_tokens', sources, searched: blocks.some((b) => b.type === 'server_tool_use') }));
   return { ok: true };
 }

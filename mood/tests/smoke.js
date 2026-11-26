@@ -569,7 +569,9 @@ function seed() {
   check('API 키가 없으면 AI 분석 단추가 없음', !(await page.$('[data-act=aiRun]')) && !!(await page.$('[data-act=aiKeyOpen]')));
   const aiCalls = [];
   const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
-  let aiReply = { status: 200, body: { model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: '## 한눈에\n최근 2주는 기분이 높았어요.\n- 11/20 기분 8 <b>굵게</b>\n## 진료 때 말하거나 물어볼 것\n- 잠이 줄어든 것' }] } };
+  let aiReply = { status: 200, body: { model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: '' }, { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: 'bipolar guideline' } },
+    { type: 'text', text: '## 한눈에\n최근 2주는 기분이 높았어요.\n- 11/20 기분 8 <b>굵게</b>\n## 진료 때 말하거나 물어볼 것\n- 잠이 줄어든 것은 ' },
+    { type: 'text', text: '지침에서도 눈여겨보라고 해요.', citations: [{ type: 'web_search_result_location', url: 'https://www.nice.org.uk/guidance/example', title: 'Example guideline 2025', cited_text: 'x' }, { type: 'web_search_result_location', url: 'javascript:alert(1)', title: 'bad' }] }] } };
   await page.route('https://api.anthropic.com/**', (route) => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
@@ -583,8 +585,23 @@ function seed() {
   await page.waitForSelector('.card.ai');
   const call = aiCalls[0] || { headers: {}, body: { messages: [{ content: '' }] } };
   check('누르면 내 키로 Claude를 한 번 부름 (브라우저 직접 호출 머리말, 모델, 기록 본문)', aiCalls.length === 1 && call.headers['x-api-key'] === 'sk-ant-test-123' && call.headers['anthropic-dangerous-direct-browser-access'] === 'true'
-    && call.headers['anthropic-version'] === '2026-10-21' && call.body.model === 'claude-opus-5-5' && call.body.fallbacks === 'default' && /정신건강의학과/.test(call.body.system) && call.body.messages[0].content.includes('[날마다의 기록]') && call.body.messages[0].content.includes('기분 '));
-  check('받은 풀이가 제목·목록으로 보이고, 글 속의 태그는 글자 그대로 나옴', (await page.$$('.card.ai h3')).length === 2 && (await page.$$('.card.ai li')).length === 2 && !(await page.$('.card.ai li b')) && (await text('.card.ai')).includes('<b>굵게</b>'));
+    && call.headers['anthropic-version'] === '2026-10-21' && call.body.model === 'claude-opus-5-5' && call.body.fallbacks === 'default' && call.body.tools[0].type === 'web_search_20260209' && call.body.tools[0].max_uses === 6 && /정신건강의학과/.test(call.body.system) && /검색어에는 일반적인 주제어만/.test(call.body.system) && call.body.messages[0].content.includes('[날마다의 기록]') && call.body.messages[0].content.includes('기분 '));
+  check('받은 풀이가 제목·목록으로 보이고, 글 속의 태그는 글자 그대로 나옴', (await page.$$('.card.ai h3')).length === 3 && (await page.$$('.card.ai li')).length === 3 && !(await page.$('.card.ai li b')) && (await text('.card.ai')).includes('<b>굵게</b>'));
+  check('출처가 달린 글 조각이 한 문장으로 이어지고, AI가 단 자료가 목록으로 나옴 (http 주소만)', (await text('.card.ai')).includes('잠이 줄어든 것은 지침에서도 눈여겨보라고 해요.') && (await page.$$('.ai-src a')).length === 1
+    && (await page.getAttribute('.ai-src a', 'href')) === 'https://www.nice.org.uk/guidance/example' && (await text('.ai-src')).includes('nice.org.uk'));
+  // 서버가 검색하다 멈추고 돌려주면(pause_turn) 받은 것을 붙여서 이어 부른다
+  let paused = true;
+  await page.unroute('https://api.anthropic.com/**');
+  await page.route('https://api.anthropic.com/**', (route) => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    aiCalls.push({ headers: req.headers(), body: JSON.parse(req.postData()) });
+    const body = paused ? { stop_reason: 'pause_turn', content: [{ type: 'server_tool_use', id: 'srvtoolu_9', name: 'web_search', input: {} }] } : aiReply.body;
+    paused = false;
+    return route.fulfill({ status: aiReply.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  });
+  await page.click('[data-act=aiRun]'); await page.waitForFunction(() => !document.querySelector('[data-act=aiRun]').disabled);
+  check('검색하다 멈춘 응답은 이어서 한 번 더 부름', aiCalls.length === 3 && aiCalls[2].body.messages.length === 2 && aiCalls[2].body.messages[1].role === 'assistant' && aiCalls[2].body.messages[1].content[0].id === 'srvtoolu_9' && (await text('.card.ai')).includes('최근 2주는'));
   await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=clinic]');
   check('받은 풀이는 다시 열어도 남아 있음', (await text('.card.ai')).includes('최근 2주는 기분이 높았어요'));
   aiReply = { status: 401, body: { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } } };
