@@ -190,7 +190,19 @@ export function openAiKey() {
       <div class="li"><input type="password" id="ai-key" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(aiKey())}"></div>
       ${has ? `<button class="li add" data-act="aiKeyDel">${T('키와 받은 분석 지우기')}</button>` : ''}
     </section>
-    <p class="secnote">${T('Anthropic 콘솔(platform.claude.com)에 가입해 결제 수단을 넣고, API keys에서 키를 만들어 여기에 붙여 넣어요. 키를 만들 때 워크스페이스를 하나 골라 주세요.')}
+    <div class="sec">${T('키 만드는 법')}</div>
+    <section class="card"><ol class="steps">
+      <li>${T('아래 “콘솔 열기”를 눌러 Anthropic 콘솔에 가입해요. (Claude 앱 구독과는 다른, 개발자용 계정이에요.)')}</li>
+      <li>${T('콘솔의 Billing(결제)에서 카드를 넣고 금액을 조금 충전해요. 쓴 만큼 여기서 빠져요.')}</li>
+      <li>${T('API keys에서 Create key를 눌러요. 이름은 아무거나, 워크스페이스는 하나(Default)를 고르고 만들어요.')}</li>
+      <li>${T('sk-ant- 로 시작하는 긴 글자가 나와요. 한 번만 보여 주니 바로 복사해요.')}</li>
+      <li>${T('이 화면 위 칸에 붙여 넣고 “저장”을 눌러요. 그다음 진료 탭에서 “AI 분석 받기”를 누르면 돼요.')}</li>
+    </ol></section>
+    <section class="card list">
+      <a class="li add" href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener noreferrer">${T('콘솔 열기 (API keys)')}</a>
+      <a class="li add" href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener noreferrer">${T('콘솔 열기 (결제)')}</a>
+    </section>
+    <p class="secnote">${T('키는 비밀번호 같은 거예요. 남에게 보여 주거나 보내지 마세요. 새어 나갔다 싶으면 콘솔에서 그 키를 지우면 돼요.')}
       ${T('키는 이 폰에만 저장되고 백업 파일에는 들어가지 않아요. 쓴 만큼 내 계정에서 돈이 나가요.')}</p>
   </div>`;
   showSheet();

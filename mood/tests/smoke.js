@@ -584,7 +584,9 @@ function seed() {
     aiCalls.push({ headers: req.headers(), body: JSON.parse(req.postData()) });
     return route.fulfill({ status: aiReply.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(aiReply.body) });
   });
-  await page.click('[data-act=aiKeyOpen]'); await page.fill('#ai-key', 'sk-ant-test-123'); await page.click('[data-act=aiKeySave]'); await page.waitForTimeout(300);
+  await page.click('[data-act=aiKeyOpen]');
+  check('API 키 화면에 만드는 법이 순서대로 적혀 있고 콘솔로 가는 줄이 있음', (await page.$$('#sheet .steps li')).length === 5 && (await page.getAttribute('#sheet a.li >> nth=0', 'href')) === 'https://platform.claude.com/settings/keys');
+  await page.fill('#ai-key', 'sk-ant-test-123'); await page.click('[data-act=aiKeySave]'); await page.waitForTimeout(300);
   check('키를 넣으면 AI 분석 단추가 생기고, 키는 기록과 따로 저장됨', !!(await page.$('[data-act=aiRun]')) && aiCalls.length === 0 && !JSON.stringify(await store()).includes('sk-ant-test')
     && (await page.evaluate(() => localStorage.getItem('tide.aikey'))) === 'sk-ant-test-123');
   await page.click('[data-act=aiRun]');
