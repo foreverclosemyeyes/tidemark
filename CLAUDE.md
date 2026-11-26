@@ -31,6 +31,15 @@
 3. 화면이 바뀌었으면 아이폰 크기로 스크린샷을 찍어 `mood/preview/`에 넣고 사용자에게 보여 준다. (테스트 기기에는 애플 글꼴이 없으니 `settings.font = 'pretendard'`로 찍는다.)
 4. 한 가지 변경은 한 커밋으로, 무엇을 왜 바꿨는지 적는다.
 
+## 손질 도구 (`tools/`)
+
+배포되는 것이 아니라 작업할 때 쓰는 것들이다 (작업하던 계정이 없어져도 이어서 할 수 있게 저장소에 넣어 둠, 2026-11-26).
+
+- `node tools/i18n-sync.js` — `tools/add.json`에 `{ "한국어 문장": "English" }`를 적고 돌리면 `i18n.js`에 더해 주고, 코드에 안 나오는 문장을 알려 준다 (`--prune`을 주면 지운다). 끝나면 `add.json`은 `{}`로 되돌린다.
+- `node tools/deadcss.js` — 코드 어디에도 안 쓰이는 클래스의 CSS 규칙을 찾는다 (`--apply`를 주면 지운다).
+- `tools/eslint.config.mjs` — 안 쓰는 변수·import, 없는 이름을 잡는 검사. 아무 빈 폴더에 `npm i eslint globals` 한 뒤 이 설정과 `mood/js`를 복사해 `eslint js`로 돌린다.
+- 스크린샷은 저장소 맨 위에서 `python3 -m http.server 8765`를 띄우고 Playwright(iPhone 14, `settings.font = 'pretendard'`)로 찍는다.
+
 ## 정해진 것
 
 - 트위터 연동, 위젯은 하지 않는다 (서버·비용·데이터 유출 때문에 사용자가 접음 / 웹앱으로 불가).
