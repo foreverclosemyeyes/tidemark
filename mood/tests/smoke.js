@@ -569,55 +569,76 @@ function seed() {
   check('오늘 화면의 약도 그 순서로 나옴', (await page.$$eval('#app .med-row .lk', (els) => els.map((x) => x.textContent.trim()[0]).join(''))) === '다가나');
   await put(keepAll);
 
-  // AI 분석: 키를 넣기 전에는 단추가 없고, 누를 때만 기록이 나간다. 키는 기록·백업과 따로 있다. (실제 서버 대신 가짜 응답으로 확인)
+  // AI 분석: 키를 넣기 전에는 단추가 없고, 누를 때만 기록이 나간다. 맡겨 두고 나중에 받는 방식이라 앱을 닫았다 열어도 이어진다.
+  // (실제 서버 대신 가짜 응답으로 확인)
   await put(seed());
   await page.click('[data-tab=clinic]');
   check('API 키가 없으면 AI 분석 단추가 없음', !(await page.$('[data-act=aiRun]')) && !!(await page.$('[data-act=aiKeyOpen]')));
-  const aiCalls = [];
-  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
-  let aiReply = { status: 200, body: { model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: '' }, { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: 'bipolar guideline' } },
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS' };
+  const aiText = [{ type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: 'bipolar guideline' } },
     { type: 'text', text: '## 한눈에\n최근 2주는 기분이 높았어요.\n- 11/20 기분 8 <b>굵게</b>\n## 진료 때 말하거나 물어볼 것\n- 잠이 줄어든 것은 ' },
-    { type: 'text', text: '지침에서도 눈여겨보라고 해요.', citations: [{ type: 'web_search_result_location', url: 'https://www.nice.org.uk/guidance/example', title: 'Example guideline 2025', cited_text: 'x' }, { type: 'web_search_result_location', url: 'javascript:alert(1)', title: 'bad' }] }] } };
+    { type: 'text', text: '지침에서도 눈여겨보라고 해요.', citations: [{ type: 'web_search_result_location', url: 'https://www.nice.org.uk/guidance/example', title: 'Example guideline 2025', cited_text: 'x' }, { type: 'web_search_result_location', url: 'javascript:alert(1)', title: 'bad' }] }];
+  // 가짜 서버: 맡긴 일마다 번호를 주고, ready에 든 번호만 끝난 것으로 답한다. results에 번호별 결과를 넣어 둔다.
+  const posts = [], gets = [], ready = new Set(), results = {};
+  let createStatus = 200;
   await page.route('https://api.anthropic.com/**', (route) => {
-    const req = route.request();
+    const req = route.request(), url = req.url(), json = (status, body) => route.fulfill({ status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(body) });
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    aiCalls.push({ headers: req.headers(), body: JSON.parse(req.postData()) });
-    return route.fulfill({ status: aiReply.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(aiReply.body) });
+    if (req.method() === 'POST') {
+      posts.push({ headers: req.headers(), body: JSON.parse(req.postData()) });
+      return createStatus === 200 ? json(200, { id: `msgbatch_${posts.length}`, type: 'message_batch', processing_status: 'in_progress', results_url: null })
+        : json(createStatus, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } });
+    }
+    gets.push(url);
+    const id = url.split('/batches/')[1].split('/')[0];
+    if (url.endsWith('/results')) return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/x-jsonl' }, body: JSON.stringify({ custom_id: 'tidemark', result: results[id] }) + '\n' });
+    return json(200, { id, type: 'message_batch', processing_status: ready.has(id) ? 'ended' : 'in_progress' });
   });
   await page.click('[data-act=aiKeyOpen]');
   check('API 키 화면에 만드는 법이 순서대로 적혀 있고 콘솔로 가는 줄이 있음', (await page.$$('#sheet .steps li')).length === 5 && (await page.getAttribute('#sheet a.li >> nth=0', 'href')) === 'https://platform.claude.com/settings/keys');
   await page.fill('#ai-key', 'sk-ant-test-123'); await page.click('[data-act=aiKeySave]'); await page.waitForTimeout(300);
-  check('키를 넣으면 AI 분석 단추가 생기고, 키는 기록과 따로 저장됨', !!(await page.$('[data-act=aiRun]')) && aiCalls.length === 0 && !JSON.stringify(await store()).includes('sk-ant-test')
+  check('키를 넣으면 AI 분석 단추가 생기고, 키는 기록과 따로 저장됨', !!(await page.$('[data-act=aiRun]')) && posts.length === 0 && !JSON.stringify(await store()).includes('sk-ant-test')
     && (await page.evaluate(() => localStorage.getItem('tide.aikey'))) === 'sk-ant-test-123');
   await page.click('[data-act=aiRun]');
-  await page.waitForSelector('.card.ai');
-  const call = aiCalls[0] || { headers: {}, body: { messages: [{ content: '' }] } };
-  check('누르면 내 키로 Claude를 한 번 부름 (브라우저 직접 호출 머리말, 모델, 기록 본문)', aiCalls.length === 1 && call.headers['x-api-key'] === 'sk-ant-test-123' && call.headers['anthropic-dangerous-direct-browser-access'] === 'true'
-    && call.headers['anthropic-version'] === '2026-10-21' && call.body.model === 'claude-opus-5-5' && call.body.fallbacks === 'default' && call.body.tools[0].type === 'web_search_20260209' && call.body.tools[0].max_uses === 6 && /정신건강의학과/.test(call.body.system) && /검색어에는 일반적인 주제어만/.test(call.body.system) && call.body.messages[0].content.includes('[날마다의 기록]') && call.body.messages[0].content.includes('기분 '));
+  await page.waitForSelector('[data-act=aiCheck]');
+  const call = posts[0] || { headers: {}, body: { requests: [{ params: { messages: [{ content: '' }], tools: [{}] } }] } }, params = call.body.requests[0].params;
+  check('누르면 내 키로 분석을 한 번 맡김 (브라우저 직접 호출 머리말, 모델, 웹 검색, 기록 본문)', posts.length === 1 && call.headers['x-api-key'] === 'sk-ant-test-123' && call.headers['anthropic-dangerous-direct-browser-access'] === 'true'
+    && call.headers['anthropic-version'] === '2026-10-21' && call.body.requests[0].custom_id === 'tidemark' && params.model === 'claude-opus-5-5' && params.fallbacks === undefined && params.tools[0].type === 'web_search_20260209' && params.tools[0].max_uses === 6
+    && /정신건강의학과/.test(params.system) && /검색어에는 일반적인 주제어만/.test(params.system) && params.messages[0].content.includes('[날마다의 기록]') && params.messages[0].content.includes('기분 '));
+  check('맡긴 뒤에는 "읽고 있어요"가 보이고 앱을 닫아도 된다고 알려 줌', (await text('#app')).includes('앱을 닫거나 다른 앱을 써도 돼요') && !(await page.$('[data-act=aiRun]')) && (await page.evaluate(() => JSON.parse(localStorage.getItem('tide.aijob')).id)) === 'msgbatch_1');
+  // 앱을 껐다 켠 것처럼 다시 열어도 맡겨 둔 일이 이어진다. 아직 안 끝났으면 기다린다.
+  await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=clinic]');
+  await page.click('[data-act=aiCheck]'); await page.waitForTimeout(400);
+  check('다시 열어도 맡겨 둔 일이 남아 있고, 아직 안 끝났으면 기다림', !!(await page.$('[data-act=aiCheck]')) && !(await page.$('.card.ai')) && gets.some((u) => u.endsWith('/msgbatch_1')));
+  // 서버가 검색하다 멈추고 돌려주면(pause_turn) 받은 것을 붙여서 이어 맡긴다
+  results.msgbatch_1 = { type: 'succeeded', message: { stop_reason: 'pause_turn', content: [{ type: 'server_tool_use', id: 'srvtoolu_9', name: 'web_search', input: {} }] } };
+  ready.add('msgbatch_1');
+  await page.click('[data-act=aiCheck]'); await page.waitForFunction(() => (JSON.parse(localStorage.getItem('tide.aijob') || '{}')).id === 'msgbatch_2');
+  const resume = posts[1].body.requests[0].params.messages;
+  check('검색하다 멈춘 응답은 받은 것을 붙여 이어서 맡김', posts.length === 2 && resume.length === 2 && resume[1].role === 'assistant' && resume[1].content[0].id === 'srvtoolu_9');
+  results.msgbatch_2 = { type: 'succeeded', message: { model: 'claude-opus-5-5', stop_reason: 'end_turn', content: aiText } };
+  ready.add('msgbatch_2');
+  await page.click('[data-act=aiCheck]'); await page.waitForSelector('.card.ai');
+  check('끝나면 풀이가 뜨고 맡겨 둔 일은 지워짐', (await page.evaluate(() => localStorage.getItem('tide.aijob'))) === null && !!(await page.$('[data-act=aiRun]')));
   check('받은 풀이가 제목·목록으로 보이고, 글 속의 태그는 글자 그대로 나옴', (await page.$$('.card.ai h3')).length === 3 && (await page.$$('.card.ai li')).length === 3 && !(await page.$('.card.ai li b')) && (await text('.card.ai')).includes('<b>굵게</b>'));
   check('출처가 달린 글 조각이 한 문장으로 이어지고, AI가 단 자료가 목록으로 나옴 (http 주소만)', (await text('.card.ai')).includes('잠이 줄어든 것은 지침에서도 눈여겨보라고 해요.') && (await page.$$('.ai-src a')).length === 1
     && (await page.getAttribute('.ai-src a', 'href')) === 'https://www.nice.org.uk/guidance/example' && (await text('.ai-src')).includes('nice.org.uk'));
   // AI가 짚어 준 "진료 때 말하거나 물어볼 것"을 눌러 "말할 것"에 더한다
   await page.click('.ai-talk [data-act=aiTalkAdd]');
   check('AI가 짚어 준 줄을 누르면 진료 때 말할 것에 들어감', (await store()).clinic.notes.some((x) => x.includes('잠이 줄어든 것은 지침에서도')) && (await text('#talk')).includes('잠이 줄어든 것은') && !(await page.$('.ai-talk [data-act=aiTalkAdd]')) && (await text('.ai-talk')).includes('✓'));
-  // 서버가 검색하다 멈추고 돌려주면(pause_turn) 받은 것을 붙여서 이어 부른다
-  let paused = true;
-  await page.unroute('https://api.anthropic.com/**');
-  await page.route('https://api.anthropic.com/**', (route) => {
-    const req = route.request();
-    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    aiCalls.push({ headers: req.headers(), body: JSON.parse(req.postData()) });
-    const body = paused ? { stop_reason: 'pause_turn', content: [{ type: 'server_tool_use', id: 'srvtoolu_9', name: 'web_search', input: {} }] } : aiReply.body;
-    paused = false;
-    return route.fulfill({ status: aiReply.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  });
-  await page.click('[data-act=aiRun]'); await page.waitForFunction(() => !document.querySelector('[data-act=aiRun]').disabled);
-  check('검색하다 멈춘 응답은 이어서 한 번 더 부름', aiCalls.length === 3 && aiCalls[2].body.messages.length === 2 && aiCalls[2].body.messages[1].role === 'assistant' && aiCalls[2].body.messages[1].content[0].id === 'srvtoolu_9' && (await text('.card.ai')).includes('최근 2주는'));
   await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=clinic]');
   check('받은 풀이는 다시 열어도 남아 있음', (await text('.card.ai')).includes('최근 2주는 기분이 높았어요'));
-  aiReply = { status: 401, body: { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } } };
+  // 이 계정에서 웹 검색을 못 쓰면 검색 없이 다시 맡긴다
+  await page.click('[data-act=aiRun]'); await page.waitForSelector('[data-act=aiCheck]');
+  results.msgbatch_3 = { type: 'errored', error: { type: 'error', error: { type: 'invalid_request_error', message: 'web_search is not enabled for this organization' } } };
+  ready.add('msgbatch_3');
+  await page.click('[data-act=aiCheck]'); await page.waitForFunction(() => (JSON.parse(localStorage.getItem('tide.aijob') || '{}')).id === 'msgbatch_4');
+  check('웹 검색을 못 쓰는 계정이면 검색 없이 다시 맡김', posts[3].body.requests[0].params.tools === undefined);
+  await page.click('[data-act=aiCancel]');
+  check('그만두기를 누르면 맡겨 둔 일을 잊고 앞서 받은 풀이는 그대로', (await page.evaluate(() => localStorage.getItem('tide.aijob'))) === null && !!(await page.$('[data-act=aiRun]')) && (await text('.card.ai')).includes('최근 2주는'));
+  createStatus = 401;
   await page.click('[data-act=aiRun]'); await page.waitForSelector('.card.hint');
-  check('키가 틀리면 쉬운 말로 알려 주고 앞서 받은 풀이는 그대로', (await text('#app')).includes('API 키가 맞지 않아요') && (await text('.card.ai')).includes('최근 2주는'));
+  check('키가 틀리면 쉬운 말로 알려 주고 앞서 받은 풀이는 그대로', (await text('#app')).includes('API 키가 맞지 않아요') && (await text('.card.ai')).includes('최근 2주는') && (await page.evaluate(() => localStorage.getItem('tide.aijob'))) === null);
   await page.click('[data-act=aiKeyOpen]'); await page.click('[data-act=aiKeyDel]'); await page.waitForTimeout(300);
   check('키를 지우면 키와 받은 풀이가 함께 지워짐', !(await page.$('[data-act=aiRun]')) && !(await page.$('.card.ai')) && (await page.evaluate(() => localStorage.getItem('tide.aikey') === null && localStorage.getItem('tide.ai') === null)));
   await page.unroute('https://api.anthropic.com/**');

@@ -1,27 +1,33 @@
 // AI 분석: 사용자가 넣어 둔 자기 API 키로 Claude를 직접 불러, 기록 전체를 읽은 풀이를 받는다 (사용자가 정함, 2026-11-26).
+// 답을 그 자리에서 기다리지 않고 "맡겨 두고 나중에 받는" 방식(Message Batches)을 쓴다: 아이폰은 앱이 뒤로 가면 멈춰서,
+// 2~4분 걸리는 답을 기다리는 동안 다른 앱으로 가면 끊겼다 (사용자가 분석이 안 뜬다고 함). 맡긴 일의 번호만 폰에 적어 두고 앱을 다시 열 때 결과를 가져온다.
 // 서버는 두지 않는다. "AI 분석 받기"를 누를 때만 기록이 Anthropic으로 나가고, 그 밖에는 아무것도 보내지 않는다.
 // 빌드 도구가 없고 남의 스크립트를 앱에 불러오지 않기로 해서(불러오면 저장된 기록을 읽을 수 있다) SDK 대신 fetch로 Messages API를 부른다.
 // 키와 받은 풀이는 이 폰의 localStorage에만 두고(기록과는 다른 열쇠), 백업 파일에는 넣지 않는다.
 import { recordText } from './analysis.js';
-import { AI_KEY, AI_OUT } from './config.js';
+import { AI_JOB, AI_KEY, AI_OUT } from './config.js';
 import { today } from './dates.js';
 import { T } from './i18n.js';
 
-const URL = 'https://api.anthropic.com/v1/messages';
+const URL = 'https://api.anthropic.com/v1/messages/batches';
 const MODEL = 'claude-opus-5-5';
 const DAYS = 182;   // 보내는 기록: 최근 26주 (몇 달씩 가는 흐름을 읽게)
 // 최신 자료 확인: 풀이를 쓰기 전에 AI가 웹에서 진료 지침과 연구를 찾아보게 한다 (정신과 자료는 시의성이 중요하다고 사용자가 요청, 2026-11-26).
 // 검색 한 번마다 돈이 들어서 횟수를 묶어 둔다. 검색어에는 기록 내용을 넣지 않게 지시문에 적어 두었다.
 const SEARCH = { type: 'web_search_20260209', name: 'web_search', max_uses: 6 };
-const MAX_RESUME = 3;   // 서버가 검색하다 멈추고 돌려주면(pause_turn) 이어서 부르는 횟수
+const MAX_RESUME = 3;   // 서버가 검색하다 멈추고 돌려주면(pause_turn) 이어서 맡기는 횟수
 
 const read = (k) => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
 export const aiKey = () => read(AI_KEY);
 export function setAiKey(key) {
-  if (key) localStorage.setItem(AI_KEY, key); else { localStorage.removeItem(AI_KEY); localStorage.removeItem(AI_OUT); }
+  if (key) localStorage.setItem(AI_KEY, key); else [AI_KEY, AI_OUT, AI_JOB].forEach((k) => localStorage.removeItem(k));
 }
 // 마지막으로 받은 풀이: { date, text, cut(길어서 잘렸는지), sources: [{ url, title }] (AI가 근거로 단 웹 자료), searched(웹 검색을 했는지) } 또는 null
-export const aiResult = () => { try { return JSON.parse(read(AI_OUT)) || null; } catch (e) { return null; } };
+const json = (k) => { try { return JSON.parse(read(k)) || null; } catch (e) { return null; } };
+export const aiResult = () => json(AI_OUT);
+// 맡겨 둔 일: { id(서버가 준 번호), at(맡긴 시각), search(웹 검색을 켰는지), tries(이어서 맡긴 횟수), blocks(지금까지 받은 조각), ask(보낸 기록 글) } 또는 null
+export const aiJob = () => json(AI_JOB);
+export const forgetAiJob = () => localStorage.removeItem(AI_JOB);
 
 // 풀이를 맡기는 말. 정신과 전문의 수준으로 깊게 읽되, 기록만으로 진단을 내리지는 않게 한다 (이 앱은 진단 도구가 아니다).
 const SYSTEM = `당신은 기분장애·불안장애·정신병적 장애·성격장애·신경발달장애(ADHD, 지적장애 포함)를 두루 진료해 온 정신건강의학과 전문의이고, DSM-5-TR과 ICD-11의 진단 기준, 주요 진료 지침, 최근 연구를 잘 알고 있습니다.
@@ -64,64 +70,81 @@ function problem(status, message) {
   return `${T('분석을 받지 못했어요.')} (${status})`;
 }
 
-// Messages API를 한 번 부른다. 돌려주는 것: { status, data(JSON 또는 null) }. 연결이 안 되면 null.
-async function call(messages, search) {
+const headers = () => ({
+  'content-type': 'application/json',
+  'x-api-key': aiKey(),
+  'anthropic-version': '2026-10-21',
+  'anthropic-dangerous-direct-browser-access': 'true',   // 브라우저에서 바로 부르려면 필요하다 (키가 사용자 자신의 것이고 이 폰에만 있다)
+});
+const OFFLINE = () => ({ ok: false, error: T('연결하지 못했어요. 인터넷을 확인하고 다시 해 주세요.') });
+// 서버에 한 번 다녀온다. 돌려주는 것: { ok, status, data(JSON) 또는 text(글) }. 연결이 안 되면 null.
+async function http(url, body, asText) {
   try {
-    const res = await fetch(URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': aiKey(),
-        'anthropic-version': '2026-10-21',
-        'anthropic-beta': 'server-side-fallback-2026-07-01',
-        'anthropic-dangerous-direct-browser-access': 'true',   // 브라우저에서 바로 부르려면 필요하다 (키가 사용자 자신의 것이고 이 폰에만 있다)
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 16000,
-        output_config: { effort: 'high' },
-        fallbacks: 'default',   // 안전 분류기가 요청을 거절하면 서버가 다른 모델로 같은 요청을 다시 돌린다
-        system: SYSTEM,
-        ...(search ? { tools: [SEARCH] } : {}),
-        messages,
-      }),
-    });
+    const res = await fetch(url, { method: body ? 'POST' : 'GET', headers: headers(), ...(body ? { body: JSON.stringify(body) } : {}) });
+    if (asText && res.ok) return { ok: true, status: res.status, text: await res.text() };
     let data = null;
     try { data = await res.json(); } catch (e) { /* 부른 쪽에서 상태 코드로 알린다 */ }
-    return { status: res.status, ok: res.ok, data };
+    return { ok: res.ok, status: res.status, data };
   } catch (e) {
     return null;
   }
 }
+const errorOf = (r) => problem(r.status, (r.data && r.data.error && r.data.error.message) || '');
 
-// 기록을 보내고 풀이를 받아 저장한다. 잘 되면 { ok: true }, 아니면 { ok: false, error: 보여 줄 말 }
-export async function askAi() {
-  const messages = [{ role: 'user', content: `오늘은 ${today()}입니다. 아래가 제 기록입니다. 전체를 읽고 풀이해 주세요.\n\n${recordText(DAYS)}` }];
-  const offline = { ok: false, error: T('연결하지 못했어요. 인터넷을 확인하고, 분석하는 동안에는 앱을 열어 두세요.') };
-  let search = true, r = await call(messages, search);
-  if (!r) return offline;
-  // 이 계정에서 웹 검색을 못 쓰면(조직 설정에서 꺼져 있는 등) 검색 없이 한 번 더 부른다
-  if (!r.ok && /web.?search/i.test((r.data && r.data.error && r.data.error.message) || '')) {
-    search = false;
-    r = await call(messages, search);
-    if (!r) return offline;
+// 일을 맡긴다: 기록(ask)과, 이어서 맡기는 경우 지금까지 받은 조각(blocks)을 보낸다. 서버가 준 번호를 폰에 적어 둔다.
+async function submit(job) {
+  const messages = [{ role: 'user', content: job.ask }, ...(job.blocks.length ? [{ role: 'assistant', content: job.blocks }] : [])];
+  const r = await http(URL, { requests: [{ custom_id: 'tidemark', params: {
+    model: MODEL, max_tokens: 16000, output_config: { effort: 'high' }, system: SYSTEM, ...(job.search ? { tools: [SEARCH] } : {}), messages,
+  } }] });
+  if (!r) return OFFLINE();
+  if (!r.ok || !r.data || !r.data.id) return { ok: false, error: errorOf(r) };
+  localStorage.setItem(AI_JOB, JSON.stringify({ ...job, id: r.data.id }));
+  return { ok: true };
+}
+
+// "AI 분석 받기": 지금의 기록을 맡긴다. 잘 되면 { ok: true }, 아니면 { ok: false, error: 보여 줄 말 }
+export function startAi() {
+  return submit({ at: Date.now(), search: true, tries: 0, blocks: [], ask: `오늘은 ${today()}입니다. 아래가 제 기록입니다. 전체를 읽고 풀이해 주세요.\n\n${recordText(DAYS)}` });
+}
+
+// 맡겨 둔 일이 끝났는지 보고, 끝났으면 결과를 가져와 저장한다.
+// 돌려주는 것: { waiting: true }(아직) / { ok: true }(받음) / { ok: false, error }(실패. 맡겨 둔 일은 지운다). 맡긴 일이 없으면 null.
+export async function checkAi() {
+  const job = aiJob();
+  if (!job) return null;
+  const fail = (error) => { forgetAiJob(); return { ok: false, error }; };
+  const st = await http(`${URL}/${job.id}`);
+  if (!st) return { waiting: true };                     // 연결이 안 되면 다음에 다시 본다
+  if (!st.ok || !st.data) return fail(errorOf(st));
+  if (st.data.processing_status !== 'ended') return { waiting: true };
+  const res = await http(`${URL}/${job.id}/results`, null, true);
+  if (!res) return { waiting: true };
+  if (!res.ok) return fail(errorOf(res));
+  // 결과는 한 줄에 하나씩인 JSON이고, 우리는 하나만 맡겼다
+  let line = null;
+  try { line = JSON.parse(res.text.split('\n').find((l) => l.trim())); } catch (e) { /* 아래에서 알린다 */ }
+  const result = line && line.result;
+  if (!result) return fail(T('분석을 받지 못했어요.'));
+  if (result.type !== 'succeeded') {
+    const message = (result.error && ((result.error.error && result.error.error.message) || result.error.message)) || '';
+    // 이 계정에서 웹 검색을 못 쓰면(조직 설정에서 꺼져 있는 등) 검색 없이 다시 맡긴다
+    if (job.search && /web.?search/i.test(message)) { const again = await submit({ ...job, search: false, blocks: [] }); return again.ok ? { waiting: true } : fail(again.error); }
+    return fail(result.type === 'expired' ? T('하루 안에 끝나지 않아서 취소됐어요. 다시 맡겨 주세요.') : problem(400, message));
   }
-  // 검색하다 멈추고 돌려준 경우: 받은 것을 그대로 붙여 다시 보내면 서버가 이어서 한다. 풀이 글은 여러 번에 걸쳐 올 수 있어 모아 둔다.
-  const blocks = [];
-  for (let i = 0; r.ok && r.data && r.data.stop_reason === 'pause_turn' && i < MAX_RESUME; i++) {
-    blocks.push(...r.data.content);
-    r = await call([messages[0], { role: 'assistant', content: blocks }], search);
-    if (!r) return offline;
+  const data = result.message, blocks = [...job.blocks, ...(data.content || [])];
+  // 검색하다 멈추고 돌려준 경우: 받은 것을 그대로 붙여 다시 맡기면 서버가 이어서 한다
+  if (data.stop_reason === 'pause_turn' && job.tries < MAX_RESUME) {
+    const again = await submit({ ...job, tries: job.tries + 1, blocks });
+    return again.ok ? { waiting: true } : fail(again.error);
   }
-  const data = r.data;
-  if (!r.ok || !data) return { ok: false, error: problem(r.status, (data && data.error && data.error.message) || '') };
-  if (data.stop_reason === 'refusal') return { ok: false, error: T('AI가 이번 요청에는 답하지 않았어요.') };
-  blocks.push(...(data.content || []));
+  if (data.stop_reason === 'refusal') return fail(T('AI가 이번 요청에는 답하지 않았어요.'));
   // 출처가 달린 글은 여러 조각으로 나뉘어 오므로 그대로 이어 붙인다 (조각 사이에 줄을 넣으면 문장이 끊긴다)
   const texts = blocks.filter((b) => b.type === 'text'), text = texts.map((b) => b.text).join('').trim();
-  if (!text) return { ok: false, error: T('분석을 받지 못했어요.') };
+  if (!text) return fail(T('분석을 받지 못했어요.'));
   const sources = [];
   texts.forEach((b) => (b.citations || []).forEach((c) => { if (/^https?:\/\//.test(c.url || '') && !sources.some((x) => x.url === c.url)) sources.push({ url: c.url, title: c.title || c.url }); }));
   localStorage.setItem(AI_OUT, JSON.stringify({ date: today(), text, cut: data.stop_reason === 'max_tokens', sources, searched: blocks.some((b) => b.type === 'server_tool_use') }));
+  forgetAiJob();
   return { ok: true };
 }
