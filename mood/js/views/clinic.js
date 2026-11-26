@@ -142,8 +142,8 @@ export function viewClinic() {
       <button class="li add" data-act="aiKeyOpen">${IC.spark}&nbsp; ${aiKey() ? T('API 키 바꾸기 · 지우기') : T('AI 분석을 쓰려면 API 키 넣기')}</button>
       <button class="li add" data-act="copyAi">${IC.note}&nbsp; ${T('AI에게 물어볼 글 복사 (최근 8주)')}</button>
     </section>
-    <p class="secnote">${T('“AI 분석 받기”를 누르면 최근 6달의 기록과 메모가 Anthropic(Claude)으로 전송되고, 정신과 진료의 눈으로 읽은 풀이가 여기에 떠요. 누를 때만 전송돼요. 내 API 키로 부르는 것이라 한 번에 몇백 원쯤 들어요.')}
-      ${T('AI의 풀이는 진단이 아니고 틀릴 수 있어요. 진료 때 이야기할 거리로 써 주세요.')}</p>
+    <p class="secnote">${T('“AI 분석 받기”를 누르면 최근 6달의 기록과 메모가 Anthropic(Claude)으로 전송되고, AI가 기록 전체를 읽고 쓴 풀이가 여기에 떠요. 누를 때만 전송돼요. 내 API 키로 부르는 것이라 한 번에 몇백 원쯤 들어요.')}
+      ${T('AI는 의사가 아니에요. 정신과 진료 지식을 바탕으로 읽으라고 시켰을 뿐이라, 풀이는 진단이 아니고 틀릴 수 있어요. 진료 때 이야기할 거리로 써 주세요.')}</p>
     <p class="foot">${DISCLAIMER}</p>`;
 }
 
