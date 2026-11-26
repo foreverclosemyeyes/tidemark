@@ -74,16 +74,24 @@ export function summaryText(weeks) {
   ].join('\n');
 }
 
+const TALK_MAX = 200;   // "말할 것" 한 줄의 가장 긴 길이 (입력 칸의 maxlength와 같다)
 const bullets = (list) => (list.length ? `<ul>${list.map((x) => `<li>${x}</li>`).join('')}</ul>` : '');
 // 표 한 줄: 첫 칸은 이름, 나머지는 값
 const tr = (cells, head) => `<div class="tr${head ? ' th' : ''}">${cells.map((c) => `<span>${c}</span>`).join('')}</div>`;
 
 // AI가 쓴 글을 화면에 옮긴다: "## " 로 시작하는 줄은 제목, "- " 로 시작하는 줄은 목록, 나머지는 문단. 글자는 전부 그대로 보여 준다 (HTML로 읽지 않는다).
+// "진료 때 말하거나 물어볼 것" 아래의 줄에는 "말할 것"에 더하는 단추가 붙는다 (이미 더한 줄은 ✓).
 function aiHtml(text) {
-  let html = '', list = false;
+  const mine = clinicData().notes;
+  let html = '', list = false, talk = false;
   const close = () => { if (list) { html += '</ul>'; list = false; } };
   text.split('\n').map((l) => l.trim()).filter(Boolean).forEach((l) => {
-    if (l.startsWith('## ')) { close(); html += `<h3>${esc(l.slice(3))}</h3>`; } else if (l.startsWith('- ')) { if (!list) { html += '<ul>'; list = true; } html += `<li>${esc(l.slice(2))}</li>`; } else { close(); html += `<p>${esc(l)}</p>`; }
+    if (l.startsWith('## ')) { close(); talk = l.includes('진료 때'); html += `<h3>${esc(l.slice(3))}</h3>`; return; }
+    if (!l.startsWith('- ')) { close(); html += `<p>${esc(l)}</p>`; return; }
+    if (!list) { html += `<ul${talk ? ' class="ai-talk"' : ''}>`; list = true; }
+    const item = l.slice(2), short = item.slice(0, TALK_MAX);
+    html += !talk ? `<li>${esc(item)}</li>` : `<li><span>${esc(item)}</span>${mine.includes(short) ? '<i>✓</i>'
+      : `<button type="button" class="mini" data-act="aiTalkAdd" data-t="${esc(short)}" aria-label="${T('진료 때 말할 것에 더하기')}">+</button>`}</li>`;
   });
   close();
   return html;
@@ -91,6 +99,8 @@ function aiHtml(text) {
 
 export function viewClinic() {
   const c = clinicData(), pick = clinicView.weeks, state = recentState(), changes = medChanges(), out = aiResult();
+  // 말할 것과 진료 기록의 한 줄: 긴 글은 두 줄까지만 보이고, 누르면 다 펼쳐진다 (길게 적은 메모가 화면을 다 차지한다고 해서)
+  const fold = (head, text) => `<button type="button" class="lk talk clamp" data-act="talkToggle">${head ? `<small>${head}</small>` : ''}<span class="tx">${text}</span></button>`;
   const del = (act, i) => `<button class="txt dim" data-act="${act}" data-i="${i}" aria-label="${T('삭제')}">✕</button>`;
   const range = (w, label) => `<button data-act="clinicWeeks" data-w="${w}" aria-pressed="${pick === w}">${label}</button>`;
   app.innerHTML = `
@@ -102,14 +112,14 @@ export function viewClinic() {
 
     <div class="sec">${T('진료 때 말할 것')}</div>
     <section class="card list" id="talk">
-      ${c.notes.map((x, i) => `<div class="li"><span class="lk talk">${esc(x)}</span>${del('clinicNoteDel', i)}</div>`).join('')}
-      <div class="li"><input type="text" id="c-note" maxlength="200" placeholder="${T('생각날 때 한 줄씩 적어 두기')}" autocomplete="off">
+      ${c.notes.map((x, i) => `<div class="li">${fold('', esc(x))}${del('clinicNoteDel', i)}</div>`).join('')}
+      <div class="li"><input type="text" id="c-note" maxlength="${TALK_MAX}" placeholder="${T('생각날 때 한 줄씩 적어 두기')}" autocomplete="off">
         <button class="mini" data-act="clinicNoteAdd">${T('추가')}</button></div>
     </section>
 
     <div class="sec">${T('진료 · 약 변경 기록')}</div>
     <section class="card list" id="log">
-      ${c.log.map((x, i) => `<div class="li"><span class="lk talk"><small>${shortDate(x.date)} · ${kindName(x.kind)}</small>${esc(x.text)}</span>${del('logDel', i)}</div>`).reverse().join('')}
+      ${c.log.map((x, i) => `<div class="li">${fold(`${shortDate(x.date)} · ${kindName(x.kind)}`, esc(x.text))}${del('logDel', i)}</div>`).reverse().join('')}
       <div class="li logadd"><button class="mini" data-act="logAdd" data-kind="visit">${T('+ 진료 메모')}</button>
         <button class="mini" data-act="logAdd" data-kind="med">${T('+ 약 바꾼 날')}</button></div>
     </section>

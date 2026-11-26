@@ -468,6 +468,12 @@ function seed() {
   await page.evaluate((k) => { const d = JSON.parse(localStorage.getItem(k)); d.clinic = { notes: [], ...d.clinic, log: [{ date: '2026-11-14', kind: 'visit', text: '긴 진료 메모 '.repeat(12) }] }; localStorage.setItem(k, JSON.stringify(d)); }, KEY);
   await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=clinic]');
   const dateBox = await page.$eval('.talk small', (x) => [x.getBoundingClientRect().height, parseFloat(getComputedStyle(x).lineHeight) || 20, x.getBoundingClientRect().width]);
+  const tall = () => page.$eval('#log .talk', (x) => x.getBoundingClientRect().height);
+  const folded = await tall();
+  await page.click('#log .talk');
+  check('긴 진료 메모는 두 줄로 접혀 있다가 누르면 펼쳐짐', folded < 90 && (await tall()) > folded + 20, folded);
+  await page.click('#log .talk');
+  check('다시 누르면 접힘', Math.abs((await tall()) - folded) < 1);
   check('진료 기록의 날짜가 한 줄로 보임', dateBox[0] < dateBox[1] * 1.6 && dateBox[2] > 150, dateBox.join());
   await page.click('[data-tab=today]');
 
@@ -589,6 +595,9 @@ function seed() {
   check('받은 풀이가 제목·목록으로 보이고, 글 속의 태그는 글자 그대로 나옴', (await page.$$('.card.ai h3')).length === 3 && (await page.$$('.card.ai li')).length === 3 && !(await page.$('.card.ai li b')) && (await text('.card.ai')).includes('<b>굵게</b>'));
   check('출처가 달린 글 조각이 한 문장으로 이어지고, AI가 단 자료가 목록으로 나옴 (http 주소만)', (await text('.card.ai')).includes('잠이 줄어든 것은 지침에서도 눈여겨보라고 해요.') && (await page.$$('.ai-src a')).length === 1
     && (await page.getAttribute('.ai-src a', 'href')) === 'https://www.nice.org.uk/guidance/example' && (await text('.ai-src')).includes('nice.org.uk'));
+  // AI가 짚어 준 "진료 때 말하거나 물어볼 것"을 눌러 "말할 것"에 더한다
+  await page.click('.ai-talk [data-act=aiTalkAdd]');
+  check('AI가 짚어 준 줄을 누르면 진료 때 말할 것에 들어감', (await store()).clinic.notes.some((x) => x.includes('잠이 줄어든 것은 지침에서도')) && (await text('#talk')).includes('잠이 줄어든 것은') && !(await page.$('.ai-talk [data-act=aiTalkAdd]')) && (await text('.ai-talk')).includes('✓'));
   // 서버가 검색하다 멈추고 돌려주면(pause_turn) 받은 것을 붙여서 이어 부른다
   let paused = true;
   await page.unroute('https://api.anthropic.com/**');

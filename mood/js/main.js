@@ -191,6 +191,10 @@ const actions = {
     ui.aiError = r.ok ? '' : r.error;
     if (ui.tab === 'clinic' && !sheetOpen()) render();
   },
+  // 진료 화면: 접혀 있는 긴 글을 누르면 펼치고, 다시 누르면 접는다
+  talkToggle: (el) => el.classList.toggle('clamp'),
+  // AI가 짚어 준 줄을 "진료 때 말할 것"에 더한다
+  aiTalkAdd: (el) => { clinicData().notes.push(el.dataset.t); save(); render(); toast(T('진료 때 말할 것에 더했어요')); },
   logAdd: (el) => openLog(el.dataset.kind),
   logSave: (el) => {
     const date = $('#l-date').value, text = $('#l-text').value.trim(), kind = el.dataset.kind;

@@ -353,6 +353,8 @@ input[type=date] { border: 0; outline: none; background: var(--card2); color: va
 /* 긴 글이 들어가는 줄: 날짜는 글 위에 한 줄로 두고(옆에 두면 좁게 밀려 세로로 꺾인다), 위아래 여백을 넉넉히 */
 .lk.talk { display: block; flex: 1 1 auto; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; }
 .li:has(> .talk) { padding-top: 14px; padding-bottom: 14px; }
+button.lk.talk { text-align: left; color: var(--text); font: inherit; }
+.talk.clamp .tx { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .talk small { display: block; margin: 0 0 4px; font-size: calc(12px * var(--fs, 1.12)); }
 .logadd { justify-content: flex-start; gap: 8px; }
 
@@ -463,6 +465,11 @@ input[type=date] { border: 0; outline: none; background: var(--card2); color: va
 .ai ul { margin: 6px 0; padding-left: 18px; }
 .ai li { margin: 4px 0; }
 .ai .ai-date, .ai .mut { color: var(--muted); font-size: calc(12px * var(--fs, 1.12)); }
+.ai-talk { list-style: none; padding-left: 0 !important; }
+.ai-talk li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 6px 0; margin: 0; }
+.ai-talk li + li { border-top: 0.5px solid var(--line); }
+.ai-talk .mini { flex: none; min-width: 34px; padding: 4px 0; text-align: center; }
+.ai-talk i { flex: none; width: 34px; text-align: center; font-style: normal; color: var(--muted); }
 .ai-src { list-style: none; padding-left: 0 !important; }
 .ai-src a { color: var(--text); text-decoration: underline; text-decoration-color: var(--faint); text-underline-offset: 3px; }
 .ai-src small { display: block; color: var(--muted); font-size: calc(11.5px * var(--fs, 1.12)); }

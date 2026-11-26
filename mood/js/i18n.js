@@ -273,6 +273,8 @@ const DICT = {
   '취소': 'Cancel',
   '완료': 'Done',
   '설정': 'Settings',
+  '진료 때 말할 것에 더하기': 'Add to things to say',
+  '진료 때 말할 것에 더했어요': 'Added to things to say',
   'AI가 근거로 단 자료': 'Sources the AI cited',
   '웹에서 자료를 찾아봤지만 글에 단 출처는 없어요.': 'The AI searched the web but attached no sources to the text.',
   '이번 분석은 최신 자료를 찾아보지 않고 AI가 아는 범위에서 쓴 거예요.': 'This analysis was written from what the AI already knows, without looking up recent sources.',
