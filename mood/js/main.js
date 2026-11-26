@@ -6,7 +6,7 @@ import { exportData, giveFile, hasAlarms, importData, makeIcs, remind, snoozeBac
 import { F, T } from './i18n.js';
 import { lockNow, removePin, setPin } from './lock.js';
 import { addDose, medKey, medsFor, normDose, setMeds, sugHtml, toggleDoseTime } from './meds.js';
-import { aiJob, checkAi, forgetAiJob, setAiKey, startAi } from './ai.js';
+import { askAi, setAiKey } from './ai.js';
 import { countVisit } from './count.js';
 import { render } from './render.js';
 import { onSwipe, slide } from './swipe.js';
@@ -39,22 +39,6 @@ function dayEntry() {
   delete db.taken[d];
   return e;
 }
-
-// 맡겨 둔 AI 분석이 끝났는지 본다. 앱을 열 때, 앱으로 돌아올 때, 열어 둔 동안에는 20초마다.
-// say: 사용자가 "지금 확인"을 눌렀을 때는 아직이라는 것도 알려 준다.
-let aiPolling = false;
-async function pollAi(say) {
-  if (aiPolling || !aiJob()) return;
-  aiPolling = true;
-  const r = await checkAi();
-  aiPolling = false;
-  if (!r) return;
-  if (r.waiting) { if (say) toast(T('아직 읽는 중이에요')); return; }
-  ui.aiError = r.ok ? '' : r.error;
-  if (r.ok) toast(T('AI 분석이 도착했어요'));
-  if (ui.tab === 'clinic' && !sheetOpen()) render();
-}
-setInterval(() => { if (!document.hidden) pollAi(); }, 20000);
 
 let aboutTaps = [];   // 버전 글자를 누른 시각들 (aboutTap)
 
@@ -199,16 +183,14 @@ const actions = {
   aiKeySave: () => { setAiKey($('#ai-key').value.trim()); ui.aiError = ''; closeSheet(); render(); },
   aiKeyDel: () => { setAiKey(''); ui.aiError = ''; closeSheet(); render(); },
   aiRun: async () => {
-    if (ui.aiBusy || aiJob()) return;
+    if (ui.aiBusy) return;
     ui.aiBusy = true; ui.aiError = '';
     render();
-    const r = await startAi();
+    const r = await askAi();
     ui.aiBusy = false;
     ui.aiError = r.ok ? '' : r.error;
     if (ui.tab === 'clinic' && !sheetOpen()) render();
   },
-  aiCheck: () => pollAi(true),
-  aiCancel: () => { forgetAiJob(); ui.aiError = ''; render(); },
   // 진료 화면: 접혀 있는 긴 글을 누르면 펼치고, 다시 누르면 접는다
   talkToggle: (el) => el.classList.toggle('clamp'),
   // AI가 짚어 준 줄을 "진료 때 말할 것"에 더한다
@@ -423,7 +405,7 @@ $('#importFile').addEventListener('change', (ev) => {
 // 자정을 넘긴 뒤 앱으로 돌아오면 '오늘'을 새로 계산
 let lastDay = today();
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) { countVisit(); pollAi(); }
+  if (!document.hidden) countVisit();
   if (document.hidden || today() === lastDay) return;
   if (ui.selected === lastDay) ui.selected = today();
   lastDay = today();
@@ -441,7 +423,6 @@ applyFont();
 render();
 if (careUnasked()) openWelcome();
 countVisit();
-pollAi();
 // 잠금: 열 때 가리고, 다른 앱으로 나갈 때도 바로 가려서 앱 전환 화면에 기록이 비치지 않게 한다
 lockNow();
 document.addEventListener('visibilitychange', () => { if (document.hidden) lockNow(); });
