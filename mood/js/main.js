@@ -6,6 +6,7 @@ import { exportData, giveFile, hasAlarms, importData, makeIcs, remind, snoozeBac
 import { F, T } from './i18n.js';
 import { lockNow, removePin, setPin } from './lock.js';
 import { addDose, medKey, medsFor, normDose, setMeds, sugHtml, toggleDoseTime } from './meds.js';
+import { askAi, setAiKey } from './ai.js';
 import { countVisit } from './count.js';
 import { render } from './render.js';
 import { onSwipe, slide } from './swipe.js';
@@ -13,7 +14,7 @@ import { clinicView, standalone, trend, ui } from './state.js';
 import { CARE_ITEMS } from './constants.js';
 import { careOn, careUnasked, db, save } from './store.js';
 import { applyFont, applyTheme, themeQuery } from './theme.js';
-import { clinicData, clinicWeeks, openLog, summaryText } from './views/clinic.js';
+import { clinicData, clinicWeeks, openAiKey, openLog, summaryText } from './views/clinic.js';
 import { notesListHtml, openNotes } from './views/notes.js';
 import { SLIDERS, cafHead, fxHtml, medsHtml, psychHtml, openRecord, saveEntry, sleepHtml, syncForm } from './views/record.js';
 import { printoutHtml } from './views/printout.js';
@@ -177,6 +178,19 @@ const actions = {
   // 진료 탭
   clinicWeeks: (el) => { clinicView.weeks = el.dataset.w === 'since' ? 'since' : Number(el.dataset.w); render(); },
   // 진료 메모 · 약 바꾼 날: 적는 화면 열기, 저장(날짜순으로 끼워 넣음), 지우기
+  // AI 분석: 키 넣기·지우기, 분석 받기 (받는 동안 단추를 잠그고, 끝나면 진료 화면을 다시 그린다)
+  aiKeyOpen: openAiKey,
+  aiKeySave: () => { setAiKey($('#ai-key').value.trim()); ui.aiError = ''; closeSheet(); render(); },
+  aiKeyDel: () => { setAiKey(''); ui.aiError = ''; closeSheet(); render(); },
+  aiRun: async () => {
+    if (ui.aiBusy) return;
+    ui.aiBusy = true; ui.aiError = '';
+    render();
+    const r = await askAi();
+    ui.aiBusy = false;
+    ui.aiError = r.ok ? '' : r.error;
+    if (ui.tab === 'clinic' && !sheetOpen()) render();
+  },
   logAdd: (el) => openLog(el.dataset.kind),
   logSave: (el) => {
     const date = $('#l-date').value, text = $('#l-text').value.trim(), kind = el.dataset.kind;

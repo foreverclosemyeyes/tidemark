@@ -230,10 +230,11 @@ export function medChanges() {
   }).filter(Boolean).reverse();
 }
 
-// AI 앱에 붙여 넣을 수 있는 최근 4주 요약 글
-export function aiSummary() {
+// 최근 days일의 기록을 날마다 한 줄씩 글로 옮긴 것 (AI에게 읽힐 때 쓴다: 복사용 글과 앱 안의 AI 분석이 같이 쓴다).
+// 맨 위에 숫자의 뜻을 적고, 진료·약 변경 기록을 아래에 붙인다.
+export function recordText(days) {
   const t = today(), lines = [];
-  for (let i = 55; i >= 0; i--) {
+  for (let i = days - 1; i >= 0; i--) {
     const d = addDays(t, -i), e = db.entries[d], meds = medsText(medsFor(d));
     if (!e && !meds && !lines.length) continue;   // 기록을 시작하기 전의 빈 날은 뺀다
     if (!e) { if (meds) lines.push(`${d} | (기록 없음) | 약: ${meds}`); continue; }
@@ -244,8 +245,16 @@ export function aiSummary() {
       e.appetite != null ? `식욕 ${e.appetite}` : '', e.drinks ? `카페인 약 ${cafMg(e.drinks)}mg(${drinkText(e.drinks) || '없음'})` : e.caffeine != null ? `카페인 ${e.caffeine}/10` : '', `약: ${meds || '없음'}`, fxNames(e.fx).length ? `부작용: ${fxNames(e.fx).join(', ')}` : '', ...(e.custom ? customDefs().map((c) => (customText(c, e.custom[c.id]) ? `${c.name}: ${customText(c, e.custom[c.id])}` : '')) : []), signs ? `체크: ${signs}` : '', e.note ? `메모: ${e.note}` : '']
       .filter(Boolean).join(' | '));
   }
-  const log = ((db.clinic || {}).log || []).filter((x) => x.date > addDays(t, -56)).map((x) => `${x.date} | ${x.kind === 'med' ? '약 변경' : '진료'} | ${x.text || ''}`);
-  return `아래는 내가 직접 적은 최근 8주 기분·수면·복약 기록이야 (기분·에너지·자신감·식욕·카페인은 0~10, 스트레스·불안·죽고 싶은 생각은 0~4, 날마다 한 줄).
+  const log = ((db.clinic || {}).log || []).filter((x) => x.date > addDays(t, -days)).map((x) => `${x.date} | ${x.kind === 'med' ? '약 변경' : '진료'} | ${x.text || ''}`);
+  return `(기분·에너지·자신감·식욕·카페인은 0~10, 스트레스·불안·죽고 싶은 생각은 0~4, 날마다 한 줄. 적지 않은 항목은 빠져 있음)
+
+[날마다의 기록]
+${lines.join('\n') || '(기록 없음)'}${log.length ? `\n\n[진료 · 약 변경 기록]\n${log.join('\n')}` : ''}`;
+}
+
+// AI 앱에 붙여 넣을 수 있는 글 (최근 8주)
+export function aiSummary() {
+  return `아래는 내가 직접 적은 최근 8주 기분·수면·복약 기록이야.
 이 기록 전체를 꼼꼼히 읽고 아래 순서로 정리해 줘. 진단은 하지 말고, 모든 말에 날짜와 숫자를 근거로 붙여 줘. 기록에 없는 것은 짐작하지 마.
 1. 8주의 흐름: 기분·에너지·잠이 언제 올라가고 내려갔는지, 시기를 나눠서.
 2. 같이 움직인 것들: 잠, 약을 먹은 날과 안 먹은 날, 약을 바꾼 날, 생리, 카페인, 내가 만든 항목이 기분·불안과 어떻게 겹치는지. 겹쳐 보일 뿐인지 반복되는 것인지 구분해서.
@@ -253,8 +262,7 @@ export function aiSummary() {
 4. 눈여겨볼 날: 죽고 싶은 생각, 공황, 정신병적 증상, 아주 짧은 잠이 있던 날과 그 앞뒤.
 5. 진료 때 의사에게 말하거나 물어볼 것 다섯 가지 이내.
 
-[날마다의 기록]
-${lines.join('\n') || '(기록 없음)'}${log.length ? `\n\n[진료 · 약 변경 기록]\n${log.join('\n')}` : ''}`;
+${recordText(56)}`;
 }
 
 // ---------- 진료용 요약: 최근 n주를 숫자로 정리 (화면·글·인쇄가 같이 쓴다) ----------

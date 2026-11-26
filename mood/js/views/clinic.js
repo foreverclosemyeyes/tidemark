@@ -1,12 +1,13 @@
 // 진료 화면: 진료에 들고 갈 것들만 둔다. 다음 진료일, 진료 때 말할 것, 진료·약 변경 기록, 약을 바꾼 앞뒤, 최근 7일 읽기, 요약 내보내기(PDF·글).
 // 그래프는 여기에 두지 않는다: 흐름 탭의 한 장(sheet.js)과 겹쳐서, 화면에서는 흐름에서 보고 PDF에만 같은 그림이 들어간다 (사용자가 정함, 2026-11-25).
+import { aiKey, aiResult } from '../ai.js';
 import { medChanges, recentState, summary } from '../analysis.js';
 import { DISCLAIMER, LEVELS, customText } from '../constants.js';
 import { durText, md, parse, today } from '../dates.js';
 import { app, esc, sheet, showSheet } from '../dom.js';
 import { F, T } from '../i18n.js';
 import { IC } from '../icons.js';
-import { clinicView } from '../state.js';
+import { clinicView, ui } from '../state.js';
 import { customDefs, db } from '../store.js';
 import { settingsButton } from './settings.js';
 
@@ -77,8 +78,19 @@ const bullets = (list) => (list.length ? `<ul>${list.map((x) => `<li>${x}</li>`)
 // 표 한 줄: 첫 칸은 이름, 나머지는 값
 const tr = (cells, head) => `<div class="tr${head ? ' th' : ''}">${cells.map((c) => `<span>${c}</span>`).join('')}</div>`;
 
+// AI가 쓴 글을 화면에 옮긴다: "## " 로 시작하는 줄은 제목, "- " 로 시작하는 줄은 목록, 나머지는 문단. 글자는 전부 그대로 보여 준다 (HTML로 읽지 않는다).
+function aiHtml(text) {
+  let html = '', list = false;
+  const close = () => { if (list) { html += '</ul>'; list = false; } };
+  text.split('\n').map((l) => l.trim()).filter(Boolean).forEach((l) => {
+    if (l.startsWith('## ')) { close(); html += `<h3>${esc(l.slice(3))}</h3>`; } else if (l.startsWith('- ')) { if (!list) { html += '<ul>'; list = true; } html += `<li>${esc(l.slice(2))}</li>`; } else { close(); html += `<p>${esc(l)}</p>`; }
+  });
+  close();
+  return html;
+}
+
 export function viewClinic() {
-  const c = clinicData(), pick = clinicView.weeks, state = recentState(), changes = medChanges();
+  const c = clinicData(), pick = clinicView.weeks, state = recentState(), changes = medChanges(), out = aiResult();
   const del = (act, i) => `<button class="txt dim" data-act="${act}" data-i="${i}" aria-label="${T('삭제')}">✕</button>`;
   const range = (w, label) => `<button data-act="clinicWeeks" data-w="${w}" aria-pressed="${pick === w}">${label}</button>`;
   app.innerHTML = `
@@ -121,10 +133,17 @@ export function viewClinic() {
       ${state.notes.map((x) => `<div class="beyond">${x}</div>`).join('')}
       <p>${T('진단이 아니에요. 진료 때 보여 주며 이야기해 보세요.')}</p></section>` : ''}
 
-    <div class="sec">${T('AI에게 물어보기')}</div>
-    <section class="card list"><button class="li add" data-act="copyAi">${IC.spark}&nbsp; ${T('AI에게 물어볼 글 복사 (최근 8주)')}</button></section>
-    <p class="secnote">${T('기록과 메모, 약, 생리를 통째로 읽고 풀이하는 것은 이 앱 안에서는 못 해요. 복사한 글을 Claude나 ChatGPT 같은 앱에 붙여 넣으면 전체를 읽고 정리해 줘요.')}
-      ${T('AI용 글을 Claude나 ChatGPT 같은 앱에 붙여 넣는 순간 그 기록은 해당 AI 서비스로 전송돼요.')}</p>
+    <div class="sec">${T('AI 분석')}</div>
+    ${aiKey() ? `<button class="btn" data-act="aiRun"${ui.aiBusy ? ' disabled' : ''}>${ui.aiBusy ? T('기록을 읽는 중이에요… 1~2분 걸려요') : out ? T('AI 분석 다시 받기') : T('AI 분석 받기')}</button>
+    ${ui.aiError ? `<section class="card hint" style="margin-top:12px"><div>${esc(ui.aiError)}</div></section>` : ''}
+    ${out ? `<section class="card ai" style="margin-top:12px"><div class="ai-date">${F('{0}에 받은 분석', md(parse(out.date)))}</div>${aiHtml(out.text)}
+      ${out.cut ? `<p class="mut">${T('글이 길어서 여기서 잘렸어요.')}</p>` : ''}</section>` : ''}` : ''}
+    <section class="card list" style="margin-top:12px">
+      <button class="li add" data-act="aiKeyOpen">${IC.spark}&nbsp; ${aiKey() ? T('API 키 바꾸기 · 지우기') : T('AI 분석을 쓰려면 API 키 넣기')}</button>
+      <button class="li add" data-act="copyAi">${IC.note}&nbsp; ${T('AI에게 물어볼 글 복사 (최근 8주)')}</button>
+    </section>
+    <p class="secnote">${T('“AI 분석 받기”를 누르면 최근 6달의 기록과 메모가 Anthropic(Claude)으로 전송되고, 정신과 진료의 눈으로 읽은 풀이가 여기에 떠요. 누를 때만 전송돼요. 내 API 키로 부르는 것이라 한 번에 몇백 원쯤 들어요.')}
+      ${T('AI의 풀이는 진단이 아니고 틀릴 수 있어요. 진료 때 이야기할 거리로 써 주세요.')}</p>
     <p class="foot">${DISCLAIMER}</p>`;
 }
 
@@ -141,6 +160,25 @@ export function openLog(kind) {
       <div class="li"><textarea id="l-text" rows="4" maxlength="500" placeholder="${kind === 'med' ? T('예: 브린텔릭스 10mg → 15mg') : T('의사가 한 말, 바뀐 처방, 다음에 할 것')}"></textarea></div>
     </section>
     <p class="secnote">${kind === 'med' ? T('흐름 그래프의 그날 자리에 세로선으로 표시돼요.') : T('적어 두면 요약을 “진료 후” 기간으로 뽑을 수 있어요.')}</p>
+  </div>`;
+  showSheet();
+}
+
+// API 키를 넣고 바꾸고 지우는 화면
+export function openAiKey() {
+  const has = !!aiKey();
+  sheet.innerHTML = `<div class="sheet-in">
+    <div class="sheet-top">
+      <button class="txt" data-act="close">${T('취소')}</button>
+      <div class="st"><b>${T('API 키')}</b></div>
+      <button class="txt strong" data-act="aiKeySave">${T('저장')}</button>
+    </div>
+    <section class="card list">
+      <div class="li"><input type="password" id="ai-key" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(aiKey())}"></div>
+      ${has ? `<button class="li add" data-act="aiKeyDel">${T('키와 받은 분석 지우기')}</button>` : ''}
+    </section>
+    <p class="secnote">${T('Anthropic 콘솔(platform.claude.com)에 가입해 결제 수단을 넣고, API keys에서 키를 만들어 여기에 붙여 넣어요. 키를 만들 때 워크스페이스를 하나 골라 주세요.')}
+      ${T('키는 이 폰에만 저장되고 백업 파일에는 들어가지 않아요. 쓴 만큼 내 계정에서 돈이 나가요.')}</p>
   </div>`;
   showSheet();
 }

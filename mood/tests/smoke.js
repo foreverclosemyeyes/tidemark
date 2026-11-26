@@ -563,6 +563,40 @@ function seed() {
   check('오늘 화면의 약도 그 순서로 나옴', (await page.$$eval('#app .med-row .lk', (els) => els.map((x) => x.textContent.trim()[0]).join(''))) === '다가나');
   await put(keepAll);
 
+  // AI 분석: 키를 넣기 전에는 단추가 없고, 누를 때만 기록이 나간다. 키는 기록·백업과 따로 있다. (실제 서버 대신 가짜 응답으로 확인)
+  await put(seed());
+  await page.click('[data-tab=clinic]');
+  check('API 키가 없으면 AI 분석 단추가 없음', !(await page.$('[data-act=aiRun]')) && !!(await page.$('[data-act=aiKeyOpen]')));
+  const aiCalls = [];
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+  let aiReply = { status: 200, body: { model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: '## 한눈에\n최근 2주는 기분이 높았어요.\n- 11/20 기분 8 <b>굵게</b>\n## 진료 때 말하거나 물어볼 것\n- 잠이 줄어든 것' }] } };
+  await page.route('https://api.anthropic.com/**', (route) => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    aiCalls.push({ headers: req.headers(), body: JSON.parse(req.postData()) });
+    return route.fulfill({ status: aiReply.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(aiReply.body) });
+  });
+  await page.click('[data-act=aiKeyOpen]'); await page.fill('#ai-key', 'sk-ant-test-123'); await page.click('[data-act=aiKeySave]'); await page.waitForTimeout(300);
+  check('키를 넣으면 AI 분석 단추가 생기고, 키는 기록과 따로 저장됨', !!(await page.$('[data-act=aiRun]')) && aiCalls.length === 0 && !JSON.stringify(await store()).includes('sk-ant-test')
+    && (await page.evaluate(() => localStorage.getItem('tide.aikey'))) === 'sk-ant-test-123');
+  await page.click('[data-act=aiRun]');
+  await page.waitForSelector('.card.ai');
+  const call = aiCalls[0] || { headers: {}, body: { messages: [{ content: '' }] } };
+  check('누르면 내 키로 Claude를 한 번 부름 (브라우저 직접 호출 머리말, 모델, 기록 본문)', aiCalls.length === 1 && call.headers['x-api-key'] === 'sk-ant-test-123' && call.headers['anthropic-dangerous-direct-browser-access'] === 'true'
+    && call.headers['anthropic-version'] === '2026-10-21' && call.body.model === 'claude-opus-5-5' && call.body.fallbacks === 'default' && /정신건강의학과/.test(call.body.system) && call.body.messages[0].content.includes('[날마다의 기록]') && call.body.messages[0].content.includes('기분 '));
+  check('받은 풀이가 제목·목록으로 보이고, 글 속의 태그는 글자 그대로 나옴', (await page.$$('.card.ai h3')).length === 2 && (await page.$$('.card.ai li')).length === 2 && !(await page.$('.card.ai li b')) && (await text('.card.ai')).includes('<b>굵게</b>'));
+  await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=clinic]');
+  check('받은 풀이는 다시 열어도 남아 있음', (await text('.card.ai')).includes('최근 2주는 기분이 높았어요'));
+  aiReply = { status: 401, body: { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } } };
+  await page.click('[data-act=aiRun]'); await page.waitForSelector('.card.hint');
+  check('키가 틀리면 쉬운 말로 알려 주고 앞서 받은 풀이는 그대로', (await text('#app')).includes('API 키가 맞지 않아요') && (await text('.card.ai')).includes('최근 2주는'));
+  await page.click('[data-act=aiKeyOpen]'); await page.click('[data-act=aiKeyDel]'); await page.waitForTimeout(300);
+  check('키를 지우면 키와 받은 풀이가 함께 지워짐', !(await page.$('[data-act=aiRun]')) && !(await page.$('.card.ai')) && (await page.evaluate(() => localStorage.getItem('tide.aikey') === null && localStorage.getItem('tide.ai') === null)));
+  await page.unroute('https://api.anthropic.com/**');
+  // 일부러 낸 401 응답이 콘솔에 남긴 오류는 뺀다
+  for (let i = errors.length - 1; i >= 0; i--) if (/401|Failed to load resource/.test(errors[i])) errors.splice(i, 1);
+  await page.click('[data-tab=today]');
+
   // 오늘 화면의 네 칸은 수면에 "평소 …"가 붙어도 높이가 같다
   const tileH = await page.$$eval('.tile', (els) => els.map((x) => Math.round(x.getBoundingClientRect().height)));
   check('오늘 화면의 네 칸 높이가 모두 같음', tileH.length === 4 && new Set(tileH).size === 1 && !(await page.$('.tile .ts')), tileH.join());

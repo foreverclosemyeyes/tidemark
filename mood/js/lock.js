@@ -1,7 +1,7 @@
 // 잠금: 앱을 열 때 숫자 4자리를 묻는다.
 // 가벼운 가림막이다. 기록 자체는 암호화되지 않으므로, 폰을 다룰 줄 아는 사람까지 막지는 못한다.
 // 비밀번호는 그대로 저장하지 않고 한 방향으로 섞은 값(해시)만 db.settings.pin 에 둔다.
-import { KEY, OLD_KEY } from './config.js';
+import { AI_KEY, AI_OUT, KEY, OLD_KEY } from './config.js';
 import { toast } from './dom.js';
 import { T } from './i18n.js';
 import { db, save } from './store.js';
@@ -68,6 +68,8 @@ function forgot() {
   if (!confirm(T('정말 모든 기록을 지울까요? 되돌릴 수 없어요.'))) return;
   localStorage.removeItem(KEY);
   localStorage.removeItem(OLD_KEY);
+  localStorage.removeItem(AI_KEY);
+  localStorage.removeItem(AI_OUT);
   location.reload();
 }
 

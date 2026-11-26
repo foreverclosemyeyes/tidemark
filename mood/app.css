@@ -455,6 +455,15 @@ input[type=date] { border: 0; outline: none; background: var(--card2); color: va
 .flowkeys i.dot { width: 7px; height: 7px; border-radius: 50%; background: none; border: 1.3px solid var(--ink); }
 .flowkeys i.bar { width: 1.5px; height: 12px; border-radius: 0; }
 .flow > .yrow:first-child { margin-top: 0; }
+/* AI가 쓴 풀이 */
+.ai { padding: 16px; line-height: 1.6; font-size: calc(14.5px * var(--fs, 1.12)); overflow-wrap: anywhere; }
+.ai h3 { margin: 18px 0 6px; font-size: calc(15.5px * var(--fs, 1.12)); font-weight: 700; }
+.ai h3:first-of-type { margin-top: 8px; }
+.ai p { margin: 6px 0; }
+.ai ul { margin: 6px 0; padding-left: 18px; }
+.ai li { margin: 4px 0; }
+.ai .ai-date, .ai .mut { color: var(--muted); font-size: calc(12px * var(--fs, 1.12)); }
+.btn[disabled] { opacity: .55; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .seg.exp { margin: 0 0 10px; }
 .yrow { margin-top: 12px; }
