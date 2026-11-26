@@ -145,6 +145,7 @@ export function viewClinic() {
 
     <div class="sec">${T('AI 분석')}</div>
     ${aiKey() ? `<button class="btn" data-act="aiRun"${ui.aiBusy ? ' disabled' : ''}>${ui.aiBusy ? T('기록을 읽고 자료를 찾는 중이에요… 2~4분 걸려요') : out ? T('AI 분석 다시 받기') : T('AI 분석 받기')}</button>
+    ${ui.aiBusy ? `<p class="mut">${T('끝날 때까지 이 화면을 그대로 열어 두세요. 다른 앱으로 가거나 화면이 꺼지면 끊겨요.')}</p>` : ''}
     ${ui.aiError ? `<section class="card hint" style="margin-top:12px"><div>${esc(ui.aiError)}</div></section>` : ''}
     ${out ? `<section class="card ai" style="margin-top:12px"><div class="ai-date">${F('{0}에 받은 분석', md(parse(out.date)))}</div>${aiHtml(out.text)}
       ${out.cut ? `<p class="mut">${T('글이 길어서 여기서 잘렸어요.')}</p>` : ''}

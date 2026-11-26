@@ -186,7 +186,11 @@ const actions = {
     if (ui.aiBusy) return;
     ui.aiBusy = true; ui.aiError = '';
     render();
+    // 기다리는 몇 분 동안 화면이 저절로 꺼지면 요청이 끊기므로, 되는 기기에서는 화면을 켜 둔다
+    let awake = null;
+    try { awake = await navigator.wakeLock.request('screen'); } catch (e) { /* 못 쓰는 기기에서는 그냥 둔다 */ }
     const r = await askAi();
+    if (awake) awake.release().catch(() => {});
     ui.aiBusy = false;
     ui.aiError = r.ok ? '' : r.error;
     if (ui.tab === 'clinic' && !sheetOpen()) render();

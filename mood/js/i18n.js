@@ -273,6 +273,7 @@ const DICT = {
   '취소': 'Cancel',
   '완료': 'Done',
   '설정': 'Settings',
+  '끝날 때까지 이 화면을 그대로 열어 두세요. 다른 앱으로 가거나 화면이 꺼지면 끊겨요.': 'Keep this screen open until it finishes. Switching apps or letting the screen turn off will cut it short.',
   '키 만드는 법': 'How to get a key',
   '아래 “콘솔 열기”를 눌러 Anthropic 콘솔에 가입해요. (Claude 앱 구독과는 다른, 개발자용 계정이에요.)': 'Tap “Open Console” below and sign up for the Anthropic Console. (It is a developer account, separate from a Claude app subscription.)',
   '콘솔의 Billing(결제)에서 카드를 넣고 금액을 조금 충전해요. 쓴 만큼 여기서 빠져요.': 'Under Billing in the Console, add a card and buy a small amount of credit. Usage is deducted from it.',

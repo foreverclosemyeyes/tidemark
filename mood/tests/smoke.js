@@ -578,10 +578,11 @@ function seed() {
   let aiReply = { status: 200, body: { model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: '' }, { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: 'bipolar guideline' } },
     { type: 'text', text: '## 한눈에\n최근 2주는 기분이 높았어요.\n- 11/20 기분 8 <b>굵게</b>\n## 진료 때 말하거나 물어볼 것\n- 잠이 줄어든 것은 ' },
     { type: 'text', text: '지침에서도 눈여겨보라고 해요.', citations: [{ type: 'web_search_result_location', url: 'https://www.nice.org.uk/guidance/example', title: 'Example guideline 2025', cited_text: 'x' }, { type: 'web_search_result_location', url: 'javascript:alert(1)', title: 'bad' }] }] } };
-  await page.route('https://api.anthropic.com/**', (route) => {
+  await page.route('https://api.anthropic.com/**', async (route) => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     aiCalls.push({ headers: req.headers(), body: JSON.parse(req.postData()) });
+    await new Promise((done) => setTimeout(done, 250));   // 기다리는 동안의 화면을 볼 수 있게 조금 늦게 답한다
     return route.fulfill({ status: aiReply.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(aiReply.body) });
   });
   await page.click('[data-act=aiKeyOpen]');
@@ -590,8 +591,11 @@ function seed() {
   check('키를 넣으면 AI 분석 단추가 생기고, 키는 기록과 따로 저장됨', !!(await page.$('[data-act=aiRun]')) && aiCalls.length === 0 && !JSON.stringify(await store()).includes('sk-ant-test')
     && (await page.evaluate(() => localStorage.getItem('tide.aikey'))) === 'sk-ant-test-123');
   await page.click('[data-act=aiRun]');
+  await page.waitForSelector('[data-act=aiRun][disabled]');
+  const busyHint = (await text('#app')).includes('이 화면을 그대로 열어 두세요');
   await page.waitForSelector('.card.ai');
   const call = aiCalls[0] || { headers: {}, body: { messages: [{ content: '' }] } };
+  check('분석을 기다리는 동안 화면을 열어 두라고 알려 줌', busyHint);
   check('누르면 내 키로 Claude를 한 번 부름 (브라우저 직접 호출 머리말, 모델, 기록 본문)', aiCalls.length === 1 && call.headers['x-api-key'] === 'sk-ant-test-123' && call.headers['anthropic-dangerous-direct-browser-access'] === 'true'
     && call.headers['anthropic-version'] === '2026-10-21' && call.body.model === 'claude-opus-5-5' && call.body.fallbacks === 'default' && call.body.tools[0].type === 'web_search_20260209' && call.body.tools[0].max_uses === 6 && /정신건강의학과/.test(call.body.system) && /검색어에는 일반적인 주제어만/.test(call.body.system) && call.body.messages[0].content.includes('[날마다의 기록]') && call.body.messages[0].content.includes('기분 '));
   check('받은 풀이가 제목·목록으로 보이고, 글 속의 태그는 글자 그대로 나옴', (await page.$$('.card.ai h3')).length === 3 && (await page.$$('.card.ai li')).length === 3 && !(await page.$('.card.ai li b')) && (await text('.card.ai')).includes('<b>굵게</b>'));
