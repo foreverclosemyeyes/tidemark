@@ -289,13 +289,14 @@ function seed() {
   await page.click('[data-tab=trend]'); await page.click('[data-mode=week]');
   check('약 바꾼 날이 흐름 그래프에 세로선으로 표시됨', (await text('.flowkeys')).includes('약 변경') && (await page.$$('.flow svg.flow-chart line[stroke-opacity="0.8"]')).length === 1);
   await page.click('[data-tab=clinic]');
-  check('진료 메모가 없으면 "진료 후" 단추가 없음', (await page.$$('[data-act=clinicWeeks][data-w=since]')).length === 0);
+  check('진료 메모가 없으면 "지난 진료부터" 단추가 없음', (await page.$$('[data-act=clinicWeeks][data-w=since]')).length === 0);
   await page.click('[data-act=logAdd][data-kind=visit]');
   await page.fill('#l-date', dayAgo(9)); await page.fill('#l-text', '2주 뒤에 다시');
   await page.click('[data-act=logSave]');
+  check('진료 메모를 적으면 요약 기간이 "지난 진료부터"로 잡힘', (await page.getAttribute('[data-act=clinicWeeks][data-w=since]', 'aria-pressed')) === 'false');
   await page.click('[data-act=clinicWeeks][data-w=since]');
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
-  check('"진료 후"는 지난 진료일이 들어가는 주 단위 (9일 전 → 2주)', (await page.textContent('#printout .po-head')).includes('/ 14일') && (await store()).clinic.log[0].kind === 'visit');
+  check('"지난 진료부터"는 지난 진료일부터 오늘까지 그대로 (9일 전 → 10일)', (await page.textContent('#printout .po-head')).includes('/ 10일') && (await page.textContent('#printout .po-head')).includes('지난 진료') && (await store()).clinic.log[0].kind === 'visit');
   await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
   await page.click('[data-tab=today]'); await openSet();
   await page.fill('#cu-name', '술'); await page.click('[data-act=customAdd]');

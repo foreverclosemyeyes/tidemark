@@ -374,6 +374,10 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
   .po-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
   .po-brand { text-align: right; font-weight: 600; font-size: 12px; letter-spacing: .04em; }
   .po-brand small { display: block; font-weight: 400; letter-spacing: 0; color: var(--muted); font-size: 10.5px; margin-top: 2px; }
+  .po-talk { margin: 12px 0 0; padding: 9px 14px 10px; border: 1.5px solid #000; border-radius: 10px; break-inside: avoid; }
+  .po-talk h3 { font-size: 11px; font-weight: 700; margin: 0 0 4px; }
+  .po-talk ol { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; }
+  .po-talk li { overflow-wrap: anywhere; }
   .po-stats { display: flex; gap: 10px; margin: 12px 0 2px; }
   .po-stat { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px 8px; }
   .po-stat span { display: block; color: var(--muted); font-size: 10.5px; }
@@ -390,6 +394,7 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
   .po-block { margin: 0 0 11px; }
   .po-block h3 { font-size: 11px; font-weight: 700; margin: 0 0 4px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
   .po-row { display: flex; justify-content: space-between; gap: 12px; padding: 2.5px 0; }
+  .po-row span:first-child { flex: none; max-width: 45%; }
   .po-row span:last-child { color: var(--muted); text-align: right; }
   .po-line { padding: 2.5px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
   .po-line small { color: var(--muted); margin-right: 6px; font-size: 10.5px; }

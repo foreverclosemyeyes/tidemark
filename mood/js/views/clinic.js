@@ -21,12 +21,17 @@ export function clinicData() {
 export const kindName = (kind) => (kind === 'med' ? T('약 변경') : T('진료'));
 // 가장 최근에 다녀온 진료일 (없으면 '')
 const lastVisit = () => { const v = clinicData().log.filter((x) => x.kind === 'visit' && x.date <= today()); return v.length ? v[v.length - 1].date : ''; };
-// 요약 기간(주). "진료 후"를 골랐으면 지난 진료일이 들어가도록 주 단위로 올림한다 (최대 8주).
-export function clinicWeeks() {
-  if (clinicView.weeks !== 'since') return clinicView.weeks;
-  const from = lastVisit();
-  return from ? Math.max(1, Math.min(8, Math.ceil((1 - daysUntil(from)) / 7))) : 2;
+// 요약에 고른 기간: 1 · 2 · 4(주) 또는 'since'(지난 진료부터). 따로 고르지 않았으면 지난 진료가 적혀 있을 때는 그때부터, 없으면 2주.
+// (의사가 볼 것은 "지난 진료부터 이번 진료까지"라서 그것을 기본으로 한다. 사용자가 요청, 2026-11-27)
+const SINCE_MAX = 84;   // "지난 진료부터"로 뽑는 가장 긴 기간 (하루가 한 칸인 그림이 한 장에 읽히는 만큼. 근거 없이 내가 정함)
+export const clinicPick = () => clinicView.weeks || (lastVisit() ? 'since' : 2);
+// 요약에 들어갈 날 수 (오늘까지)
+export function clinicDays() {
+  const pick = clinicPick();
+  return pick === 'since' ? Math.max(2, Math.min(SINCE_MAX, 1 - daysUntil(lastVisit()))) : pick * 7;
 }
+// "지난 진료부터"로 뽑고 있으면 그 진료일 (아니면 '')
+export const clinicSince = () => (clinicPick() === 'since' && 1 - daysUntil(lastVisit()) <= SINCE_MAX ? lastVisit() : '');
 
 export const shortDate = (s) => { const d = parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
 const dateList = (list) => list.map(shortDate).join(', ');
@@ -49,17 +54,18 @@ export function summaryRows(s) {
     [T('스트레스 높음 이상'), s.high.stress], [T('불안 높음 이상'), s.high.anx],
     [T('정신병적 증상'), s.high.psy], [T('죽고 싶은 생각'), s.high.si], [T('5시간 미만 수면'), s.shortSleep], [T('생리'), s.period],
   ].filter(([, list]) => list.length).map(([name, list]) => [name, `${F('{0}일', list.length)} · ${dateList(list)}`]);
+  if (s.panic.length) flags.splice(2, 0, [T('공황'), `${F('{0}번', s.panic.reduce((a, [, c]) => a + c, 0))} · ${s.panic.map(([d, c]) => `${shortDate(d)}${c > 1 ? `(${c})` : ''}`).join(', ')}`]);
   return {
     averages: [[T('기분'), range(s.mood, num)], [T('에너지'), range(s.energy, num)], [T('자신감'), range(s.conf, num)], [T('수면'), range(s.sleep, dur)]],
     flags,
     signs: s.signs.map(([label, c]) => [label, F('{0}일', c)]),
-    meds: s.meds.map(([m, c]) => [`${m.name}${m.dose ? ` ${m.dose}` : ''}`, F('{0}일 중 {1}일', s.dates.length, c)]),
+    meds: s.meds.map(([m, c, missed]) => [`${m.name}${m.dose ? ` ${m.dose}` : ''}`, F('{0}일 중 {1}일', s.dates.length, c) + (missed.length ? ` · ${F('안 먹은 날 {0}', dateList(missed))}` : '')]),
   };
 }
 
 // 메신저나 메모 앱에 붙여 넣을 수 있는 글
-export function summaryText(weeks) {
-  const s = summary(weeks), r = summaryRows(s), talk = clinicData().notes;
+export function summaryText(days) {
+  const s = summary(days), r = summaryRows(s), talk = clinicData().notes;
   const part = (title, rows) => (rows.length ? [`\n[${title}]`, ...rows.map(([k, v]) => `${k}: ${v}`)] : []);
   return [
     `${T('진료용 요약')} · ${md(parse(s.dates[0]))} – ${md(parse(s.dates[s.dates.length - 1]))} · ${F('기록 {0}일 / {1}일', s.got.length, s.dates.length)}`,
@@ -98,7 +104,7 @@ function aiHtml(text) {
 }
 
 export function viewClinic() {
-  const c = clinicData(), pick = clinicView.weeks, state = recentState(), changes = medChanges(), out = aiResult();
+  const c = clinicData(), pick = clinicPick(), state = recentState(), changes = medChanges(), out = aiResult();
   // 말할 것과 진료 기록의 한 줄: 긴 글은 두 줄까지만 보이고, 누르면 다 펼쳐진다 (길게 적은 메모가 화면을 다 차지한다고 해서)
   const fold = (head, text) => `<button type="button" class="lk talk clamp" data-act="talkToggle">${head ? `<small>${head}</small>` : ''}<span class="tx">${text}</span></button>`;
   const del = (act, i) => `<button class="txt dim" data-act="${act}" data-i="${i}" aria-label="${T('삭제')}">✕</button>`;
@@ -125,7 +131,7 @@ export function viewClinic() {
     </section>
 
     <div class="sec">${T('요약 내보내기')}</div>
-    <div class="seg exp">${range(1, T('1주'))}${range(2, T('2주'))}${range(4, T('4주'))}${lastVisit() ? range('since', T('진료 후')) : ''}</div>
+    <div class="seg exp">${lastVisit() ? range('since', T('지난 진료부터')) : ''}${range(1, T('1주'))}${range(2, T('2주'))}${range(4, T('4주'))}</div>
     <div class="pair">
       <button class="btn" data-act="printSummary">${T('PDF · 인쇄')}</button>
       <button class="btn gray" data-act="copySummary">${T('글로 복사')}</button>

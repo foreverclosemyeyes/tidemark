@@ -9,5 +9,5 @@ export const standalone = () => window.navigator.standalone === true || matchMed
 // ---------- 흐름 화면 (mode: 'week' | 'month' | 'half' | 'year', pick: 고른 칸) ----------
 export const trend = { mode: 'week', anchor: today(), pick: null };
 
-// ---------- 진료 화면 (요약을 내보낼 기간: 1 / 2 / 4주 또는 'since' = 지난 진료 후) ----------
-export const clinicView = { weeks: 2 };
+// ---------- 진료 화면 (요약을 내보낼 기간: 1 / 2 / 4주 또는 'since' = 지난 진료부터. 0 = 따로 고르지 않음) ----------
+export const clinicView = { weeks: 0 };

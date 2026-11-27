@@ -14,7 +14,7 @@ import { clinicView, standalone, trend, ui } from './state.js';
 import { CARE_ITEMS } from './constants.js';
 import { careOn, careUnasked, db, save } from './store.js';
 import { applyFont, applyTheme, themeQuery } from './theme.js';
-import { clinicData, clinicWeeks, openAiKey, openLog, summaryText } from './views/clinic.js';
+import { clinicData, clinicDays, clinicSince, openAiKey, openLog, summaryText } from './views/clinic.js';
 import { notesListHtml, openNotes } from './views/notes.js';
 import { SLIDERS, cafHead, fxHtml, medsHtml, psychHtml, openRecord, saveEntry, sleepHtml, syncForm } from './views/record.js';
 import { printoutHtml } from './views/printout.js';
@@ -44,7 +44,7 @@ let aboutTaps = [];   // 버전 글자를 누른 시각들 (aboutTap)
 
 // 인쇄할 한 장을 지금 기록으로 채운다 (단추를 누를 때와, 브라우저 메뉴로 인쇄할 때). 잠겨 있으면 비워 둔다.
 function fillPrintout() {
-  $('#printout').innerHTML = $('.lock') ? '' : printoutHtml(clinicWeeks());
+  $('#printout').innerHTML = $('.lock') ? '' : printoutHtml(clinicDays(), clinicSince());
 }
 
 function redrawSettings() {
@@ -211,7 +211,7 @@ const actions = {
   },
   logDel: (el) => {
     clinicData().log.splice(Number(el.dataset.i), 1);
-    if (clinicView.weeks === 'since') clinicView.weeks = 2;
+    if (clinicView.weeks === 'since') clinicView.weeks = 0;
     save(); render();
   },
   clinicNoteAdd: () => {
@@ -223,7 +223,7 @@ const actions = {
   },
   clinicNoteDel: (el) => { clinicData().notes.splice(Number(el.dataset.i), 1); save(); render(); },
   printSummary: () => { fillPrintout(); window.print(); },
-  copySummary: async () => { await copyText(summaryText(clinicWeeks())); toast(T('복사했어요')); },
+  copySummary: async () => { await copyText(summaryText(clinicDays())); toast(T('복사했어요')); },
   lang: (el) => { db.settings.lang = el.dataset.lang; if (save()) location.reload(); },
   size: (el) => { db.settings.size = el.dataset.size; save(); applyFont(); render(); openSettings(); },
   font: (el) => { db.settings.font = el.dataset.font; save(); applyFont(); openSettings(); },

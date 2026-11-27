@@ -265,29 +265,36 @@ export function aiSummary() {
 ${recordText(56)}`;
 }
 
-// ---------- 진료용 요약: 최근 n주를 숫자로 정리 (화면·글·인쇄가 같이 쓴다) ----------
+// ---------- 진료용 요약: 오늘까지 n일을 숫자로 정리 (화면·글·인쇄가 같이 쓴다) ----------
 export const SHORT_SLEEP = 300;   // 이 분(5시간)보다 짧게 잔 날을 따로 적는다
-export function summary(weeks) {
-  const n = weeks * 7, t = today();
+export function summary(n) {
+  const t = today();
   const dates = Array.from({ length: n }, (_, i) => addDays(t, i - n + 1));
   const days = dates.map((d) => db.entries[d] || null), got = days.filter(Boolean);
   const same = (m) => (x) => x.name === m.name && (x.dose || '') === (m.dose || '');
+  // 바로 앞의 같은 길이 기간 (진료 때 "그 전보다 어떤지"를 보려고 평균만 같이 낸다)
+  const before = dates.map((d) => db.entries[addDays(d, -n)]).filter(Boolean);
   const stat = (key) => {
-    const v = got.map((e) => e[key]).filter((x) => x != null);
-    return v.length ? { avg: avg(v), min: Math.min(...v), max: Math.max(...v), n: v.length } : null;
+    const v = got.map((e) => e[key]).filter((x) => x != null), p = before.map((e) => e[key]).filter((x) => x != null);
+    return v.length ? { avg: avg(v), min: Math.min(...v), max: Math.max(...v), n: v.length, prev: p.length ? avg(p) : null } : null;
   };
+  // 그 약을 처음 먹었다고 적은 날 (그보다 앞의 날은 "안 먹은 날"로 세지 않는다)
+  const firstTaken = (m) => Object.keys(db.entries).sort().find((d) => medsFor(d).some(same(m))) || '';
+  const missed = (m) => { const first = firstTaken(m); return !first ? [] : got.filter((e) => e.date > first && !medsFor(e.date).some(same(m))).map((e) => e.date); };
   // 그 항목이 from 단계 이상이었던 날짜들
   const when = (key, from) => got.filter((e) => e[key] != null && e[key] >= from).map((e) => e.date);
   return {
-    weeks, dates, days, got,
+    dates, days, got,
     mood: stat('mood'), energy: stat('energy'), conf: stat('conf'), sleep: stat('sleepMin'),
     high: { stress: when('stress', 3), anx: when('anx', 3), psy: when('psy', 1), si: when('si', 1) },
     shortSleep: got.filter((e) => e.sleepMin != null && e.sleepMin < SHORT_SLEEP).map((e) => e.date),
     signs: SIGNS.map(([k, label]) => [label, got.filter((e) => e.signs && e.signs[k]).length]).filter(([, c]) => c),
     psych: [...new Set(got.flatMap((e) => Object.keys(e.psych || {}).filter((k) => e.psych[k])))].map((k) => [psyName(k), got.filter((e) => e.psych && e.psych[k]).length]),
     fx: [...new Set(got.flatMap((e) => Object.keys(e.fx || {}).filter((k) => e.fx[k])))].map((k) => [fxName(k), got.filter((e) => e.fx && e.fx[k]).length]),
-    // 약마다 [약, 먹은 날 수]
-    meds: db.meds.map((m) => [m, dates.filter((d) => medsFor(d).some(same(m))).length]),
+    // 약마다 [약, 먹은 날 수, 기록은 했는데 안 먹은 날짜들]
+    meds: db.meds.map((m) => [m, dates.filter((d) => medsFor(d).some(same(m))).length, missed(m)]),
+    // 공황이 있던 날: [날짜, 몇 번]
+    panic: got.filter((e) => e.panic).map((e) => [e.date, e.panic]),
     // 진료일과 약 바꾼 날
     log: (db.clinic || {}).log || [],
     period: got.filter((e) => e.period).map((e) => e.date),
