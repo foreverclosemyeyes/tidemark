@@ -21,7 +21,7 @@ export function printoutHtml(days, since) {
   const cols = columns(s.dates[0], s.dates.length, 1, flowSource());
   const daily = days <= DAILY, mondays = cols.map((_, i) => i).filter((i) => parse(cols[i].start).getDay() === 1);
   const labels = (daily ? cols.map((_, i) => i) : mondays).map((i) => [i, shortDate(cols[i].start), daily ? 'mid' : 'left']);
-  const sheet = sheetHtml({ cols, width: PAGE, labels, guides: daily ? [] : mondays.filter(Boolean), colors: true });
+  const sheet = sheetHtml({ cols, width: PAGE, labels, guides: daily ? [] : mondays.filter(Boolean), colors: true, tall: true });
   // 맨 위 숫자 칸: 평균을 크게, 그 아래 가장 낮은 날–높은 날과 바로 앞 같은 길이 기간의 평균
   const stat = (name, st, fmt) => `<div class="po-stat"><span>${name}</span><b>${st ? fmt(st.avg) : '–'}</b><small>${st ? `${fmt(st.min)} – ${fmt(st.max)}` : T('기록 없음')}</small>${
     st && st.prev != null ? `<small>${F('그 전 {0}', fmt(st.prev))}</small>` : ''}</div>`;
