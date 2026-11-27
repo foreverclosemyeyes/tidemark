@@ -18,7 +18,7 @@ import { applyFont, applyTheme, themeQuery } from './theme.js';
 import { aiHtml, clinicData, clinicDays, clinicSince, openAiKey, openLog, summaryText } from './views/clinic.js';
 import { notesListHtml, openNotes } from './views/notes.js';
 import { SLIDERS, cafHead, fxHtml, medsHtml, psychHtml, openRecord, saveEntry, sleepHtml, syncForm } from './views/record.js';
-import { printoutHtml } from './views/printout.js';
+import { openSummary, printoutHtml } from './views/printout.js';
 import { openWelcome } from './views/welcome.js';
 import { openSettings } from './views/settings.js';
 import { canShift, shiftTrend, trendRange } from './views/trend.js';
@@ -229,6 +229,8 @@ const actions = {
     $('#c-note').focus();
   },
   clinicNoteDel: (el) => { clinicData().notes.splice(Number(el.dataset.i), 1); save(); render(); },
+  // 진료용 요약을 폰 화면에 띄운다 (의사에게 폰으로 보여 줄 때)
+  showSummary: () => openSummary(clinicDays(), clinicSince()),
   // 종이용 한 장을 채우고 인쇄 화면을 연다. 채우다가 문제가 생기면 아무 일도 안 일어난 것처럼 보이지 않게 무엇이 문제인지 알린다.
   printSummary: () => {
     try { fillPrintout(); } catch (e) { toast(`${T('요약을 만들지 못했어요')} (${VERSION}: ${e.message})`); return; }

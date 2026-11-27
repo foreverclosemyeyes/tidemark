@@ -95,7 +95,7 @@ export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, 
   const xText = (y) => labels.map(([i, text, at]) => `<text x="${(at === 'mid' ? cx(i) : col * i).toFixed(1)}" y="${y}" font-size="${fs}"${at === 'mid' ? ' text-anchor="middle"' : ''} ${muted}>${text}</text>`).join('');
 
   // 1. 기분·에너지·자신감 (0~10). 약을 바꾼 날과 진료일은 세로선.
-  const H = tall ? 172 : 120, yS = (v) => 6 + (1 - v / 10) * (H - 12);
+  const H = tall ? 196 : 120, yS = (v) => 6 + (1 - v / 10) * (H - 12);
   const anyMissed = itemOn('meds') && cols.some((c) => c.missed), anyLog = cols.some((c) => c.log.length);
   // 색으로 그릴 때도 굵기는 다르게 둔다 (흑백으로 뽑아도 기분 선이 구분되게)
   const LINES = [colors ? ['conf', T('자신감'), 1.5, 'style="stroke:var(--line3)"', '<i style="background:var(--line3)"></i>']
@@ -127,7 +127,7 @@ export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, 
     ${shown.map(([k, , w, style]) => line(k, yS, w, style)).join('')}${notes}`, 'flow-chart');
 
   // 2. 잠 (0~12시간)
-  const SH = tall ? 58 : 54, yZ = (m) => 4 + (1 - Math.min(m, 720) / 720) * (SH - 8);
+  const SH = tall ? 64 : 54, yZ = (m) => 4 + (1 - Math.min(m, 720) / 720) * (SH - 8);
   const sleep = itemOn('sleep') && on('sleep') ? `<div class="yrow"><span>${T('수면')}</span></div>${svg(SH, `${vlines(SH)}${grid((tall ? [0, 3, 6, 9, 12] : [0, 6, 12]).map((h) => [h * 60, String(h)]), yZ)}${line('sleep', yZ, 2, 'style="stroke:var(--ink)"')}`)}` : '';
 
   // 3. 증상 줄: 위의 선들과 같은 말투로, 단계(0~4)를 부드러운 선과 그 아래 옅은 면으로 그린다. 높이 솟은 곳이 심했던 때다.

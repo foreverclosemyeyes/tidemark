@@ -481,10 +481,15 @@ function seed() {
   check('진료 기록의 날짜가 한 줄로 보임', dateBox[0] < dateBox[1] * 1.6 && dateBox[2] > 150, dateBox.join());
   await page.click('[data-tab=today]');
 
-  // 인쇄용 한 장: 종이 크기에 맞춘 배치가 따로 채워지고, 화면에서는 안 보인다
+  // 진료용 요약을 폰 화면으로 보기 (의사에게 폰으로 보여 줄 때): 말하고 싶은 것, 그림, 약, 메모가 한 줄로 서고 평균 숫자·변경 기록은 없다
   await page.click('[data-tab=clinic]');
+  await page.click('[data-act=showSummary]'); await page.waitForSelector('#sheet .show');
+  check('요약 보기: 폰 화면에 그림과 적은 것들이 뜸', !!(await page.$('#sheet .show svg.flow-chart')) && (await text('#sheet .st')).includes('진료용 요약') && (await text('#sheet .top-note')).includes('기록') && !(await text('#sheet')).includes('변경 기록')
+    && await page.$eval('#sheet .show', (el) => el.scrollWidth <= el.clientWidth + 1));
+  await page.click('#sheet [data-act=close]'); await page.waitForTimeout(350);
+  // 인쇄용 한 장: 종이 크기에 맞춘 배치가 따로 채워지고, 화면에서는 안 보인다
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
-  check('인쇄할 때 종이용 한 장이 채워짐 (머리말 · 숫자 칸 · 그림)', (await page.$$('#printout .po-stat')).length === 4 && !!(await page.$('#printout .po-head h1')) && !!(await page.$('#printout svg.flow-chart')) && (await page.$eval('#printout svg.flow-strip', (el) => Number(el.dataset.n))) === 14 && /--line[23]/.test(await page.$eval('#printout svg.flow-chart', (el) => el.innerHTML) + await page.$eval('#printout .flowkeys', (el) => el.innerHTML)));
+  check('인쇄할 때 종이용 한 장이 채워짐 (머리말 · 숫자 칸 · 그림)', !(await page.$('#printout .po-stat')) && !(await page.textContent('#printout')).includes('변경 기록') && !!(await page.$('#printout .po-head h1')) && !!(await page.$('#printout svg.flow-chart')) && (await page.$eval('#printout svg.flow-strip', (el) => Number(el.dataset.n))) === 14 && /--line[23]/.test(await page.$eval('#printout svg.flow-chart', (el) => el.innerHTML) + await page.$eval('#printout .flowkeys', (el) => el.innerHTML)));
   check('종이용 한 장은 화면에서는 안 보임', await page.$eval('#printout', (x) => getComputedStyle(x).display === 'none'));
   await page.emulateMedia({ media: 'print' });
   check('인쇄에서는 종이용 한 장만 보임', await page.evaluate(() => getComputedStyle(document.querySelector('#printout')).display === 'block' && getComputedStyle(document.querySelector('#app')).display === 'none'));

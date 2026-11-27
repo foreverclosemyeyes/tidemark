@@ -136,8 +136,9 @@ export function viewClinic() {
 
     <div class="sec">${T('요약 내보내기')}</div>
     <div class="seg exp">${lastVisit() ? range('since', T('지난 진료부터')) : ''}${range(1, T('1주'))}${range(2, T('2주'))}${range(4, T('4주'))}</div>
-    <div class="pair">
-      <button class="btn" data-act="printSummary">${T('PDF · 인쇄')}</button>
+    <button class="btn" data-act="showSummary">${T('요약 보기 · 의사에게 보여 주기')}</button>
+    <div class="pair" style="margin-top:10px">
+      <button class="btn gray" data-act="printSummary">${T('PDF · 인쇄')}</button>
       <button class="btn gray" data-act="copySummary">${T('글로 복사')}</button>
     </div>
     <p class="secnote" style="margin-top:10px">${T('PDF에는 흐름 그림과 위에 적은 것들이 한 장으로 들어가요. “PDF · 인쇄”를 누르면 아이폰 인쇄 화면이 뜨고, 미리보기를 두 손가락으로 벌린 뒤 공유 버튼을 누르면 저장하거나 보낼 수 있어요.')}</p>

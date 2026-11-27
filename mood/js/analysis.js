@@ -272,11 +272,9 @@ export function summary(n) {
   const dates = Array.from({ length: n }, (_, i) => addDays(t, i - n + 1));
   const days = dates.map((d) => db.entries[d] || null), got = days.filter(Boolean);
   const same = (m) => (x) => x.name === m.name && (x.dose || '') === (m.dose || '');
-  // 바로 앞의 같은 길이 기간 (진료 때 "그 전보다 어떤지"를 보려고 평균만 같이 낸다)
-  const before = dates.map((d) => db.entries[addDays(d, -n)]).filter(Boolean);
   const stat = (key) => {
-    const v = got.map((e) => e[key]).filter((x) => x != null), p = before.map((e) => e[key]).filter((x) => x != null);
-    return v.length ? { avg: avg(v), min: Math.min(...v), max: Math.max(...v), n: v.length, prev: p.length ? avg(p) : null } : null;
+    const v = got.map((e) => e[key]).filter((x) => x != null);
+    return v.length ? { avg: avg(v), min: Math.min(...v), max: Math.max(...v), n: v.length } : null;
   };
   // 그 약을 처음 먹었다고 적은 날 (그보다 앞의 날은 "안 먹은 날"로 세지 않는다)
   const firstTaken = (m) => Object.keys(db.entries).sort().find((d) => medsFor(d).some(same(m))) || '';

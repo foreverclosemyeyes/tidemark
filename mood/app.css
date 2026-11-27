@@ -361,6 +361,15 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
 .logadd { justify-content: flex-start; gap: 8px; }
 
 /* 인쇄·PDF: 요약 부분만, 흰 바탕에 검은 글씨로 (누르는 것들은 뺀다) */
+/* 진료용 요약(의사에게 보여 주는 화면과 종이)의 그래프에서만 쓰는 기분 · 에너지 · 자신감 선의 색. 다른 화면은 색 하나 그대로. */
+:root { --line1: #4fa873; --line2: #d08a4a; --line3: #5b86c9; }
+/* 의사에게 보여 주는 화면: 딱지는 무엇이 그려졌는지만 알려 준다 (눌러도 꺼지지 않는다) */
+.show .flowkeys { margin: 20px 4px 8px; gap: 4px 14px; }
+.show .flowkeys button { padding: 0; background: none; color: var(--muted); font-size: calc(11.5px * var(--fs, 1.12)); pointer-events: none; }
+.show .flowkeys button[aria-pressed=false] { display: none; }
+.show .li { align-items: flex-start; }
+.show .li .lk { flex: none; max-width: 45%; }
+.show .li .lv { text-align: right; }
 /* 인쇄·PDF: 화면은 전부 숨기고 종이용 한 장(#printout, views/printout.js)만 내보낸다 */
 #printout { display: none; }
 /* 종이 가장자리의 여백은 @page가 아니라 #printout의 안쪽 여백으로 둔다: 아이폰은 @page 여백을 따르지 않을 때가 있어 글이 종이 끝에 붙는다
@@ -368,8 +377,6 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
 @page { size: A4 landscape; margin: 0; }
 @media print {
   :root, :root[data-theme=light] { color-scheme: light; --bg: #fff; --text: #2a2a2a; --ink: #3a3a3a; --ink-inv: #fff; --muted: #767676; --faint: #b5b5b5; --line: #e6e6e6; --fill: #f6f6f4; --card: transparent; --card2: transparent; --shadow: none; }
-  /* 종이의 그래프에서 기분 · 에너지 · 자신감 선의 색 (화면보다 차분하게) */
-  :root { --line1: #4fa873; --line2: #d08a4a; --line3: #5b86c9; }
   html, body { background: #fff !important; }
   body > *:not(#printout) { display: none !important; }
   body::before { display: none !important; }
@@ -380,14 +387,8 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
   .po-head p { display: inline; margin: 0 0 0 12px; color: var(--muted); font-size: 11.5px; }
   .po-brand { color: var(--muted); font-weight: 600; font-size: 10px; letter-spacing: .08em; }
   .po-brand small { margin-left: 8px; font-weight: 400; letter-spacing: 0; font-size: 10px; }
-  /* 숫자 줄: 테두리 상자 대신 가는 줄 사이에 나란히 */
-  .po-stats { display: flex; margin: 11px 0 15px; padding: 10px 0 11px; border-top: 1px solid var(--faint); border-bottom: 1px solid var(--line); }
-  .po-stat { flex: 1; padding: 0 18px; border-left: 1px solid var(--line); }
-  .po-stat:first-child { padding-left: 0; border-left: 0; }
-  .po-stat span { display: block; color: var(--muted); font-size: 10px; letter-spacing: .04em; }
-  .po-stat b { display: block; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
-  .po-stat small { color: var(--muted); font-size: 10px; margin-right: 10px; }
   /* 두 단은 grid가 아니라 float로 나눈다 (아이폰 사파리는 인쇄할 때 grid 안의 내용을 쪽에 나누어 담지 못해 비거나 잘릴 수 있다) */
+  .po-main { margin-top: 11px; padding-top: 14px; border-top: 1px solid var(--faint); }
   .po-main::after { content: ''; display: block; clear: both; }
   .po-figs { float: left; width: 58%; }
   .po-side { float: right; width: 38%; }
