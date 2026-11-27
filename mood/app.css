@@ -365,19 +365,19 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
 #printout { display: none; }
 @page { size: A4; margin: 14mm 13mm; }
 @media print {
-  :root, :root[data-theme=light] { --bg: #fff; --text: #000; --ink: #000; --ink-inv: #fff; --muted: #555; --faint: #999; --line: #d8d8d8; --fill: #ededed; --card: transparent; --card2: transparent; --shadow: none; }
-  /* 종이의 그래프에서 에너지 · 자신감 선의 색 (기분은 고른 색) */
-  :root { --line2: #d9730d; --line3: #2f6fd6; }
+  :root, :root[data-theme=light] { --bg: #fff; --text: #2a2a2a; --ink: #3a3a3a; --ink-inv: #fff; --muted: #707070; --faint: #aaa; --line: #e3e3e3; --fill: #f5f5f5; --card: transparent; --card2: transparent; --shadow: none; }
+  /* 종이의 그래프에서 기분 · 에너지 · 자신감 선의 색 (화면보다 차분하게) */
+  :root { --line1: #4fa873; --line2: #d08a4a; --line3: #5b86c9; }
   html, body { background: #fff !important; }
   body > *:not(#printout) { display: none !important; }
   body::before { display: none !important; }
-  #printout { display: block; color: #000; font-size: 11.5px; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .po-head { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 10px; border-bottom: 1.5px solid #000; }
+  #printout { display: block; color: var(--text); font-size: 11.5px; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .po-head { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 10px; border-bottom: 1px solid var(--faint); }
   .po-head h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
   .po-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
   .po-brand { text-align: right; font-weight: 600; font-size: 12px; letter-spacing: .04em; }
   .po-brand small { display: block; font-weight: 400; letter-spacing: 0; color: var(--muted); font-size: 10.5px; margin-top: 2px; }
-  .po-talk { margin: 12px 0 0; padding: 9px 14px 10px; border: 1.5px solid #000; border-radius: 10px; break-inside: avoid; }
+  .po-talk { margin: 12px 0 0; padding: 9px 14px 10px; background: var(--fill); border-radius: 10px; break-inside: avoid; }
   .po-talk h3 { font-size: 11px; font-weight: 700; margin: 0 0 4px; }
   .po-talk ol { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; }
   .po-talk li { overflow-wrap: anywhere; }

@@ -77,7 +77,7 @@ export function columns(start, count, span, src) {
 export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, scale = 1, colors = false }) {
   const hidden = db.settings.flowOff || [], on = (k) => !hidden.includes(k);
   const n = cols.length, AX = Math.round(22 * scale), W = width - AX, col = W / n, cx = (i) => col * (i + 0.5);
-  const fs = (10 * scale).toFixed(1), muted = 'style="fill:var(--muted)"', accent = tone('mood', 10) || 'var(--ink)';
+  const fs = (10 * scale).toFixed(1), muted = 'style="fill:var(--muted)"', accent = colors ? 'var(--line1)' : tone('mood', 10) || 'var(--ink)';
   const svg = (h, inner, cls = '') => `<svg${cls ? ` class="${cls}"` : ''} data-n="${n}" width="${width}" height="${h}" viewBox="0 0 ${width} ${h}">${inner}</svg>`;
   const vlines = (h) => guides.map((i) => `<line x1="${(col * i).toFixed(1)}" x2="${(col * i).toFixed(1)}" y1="0" y2="${h}" style="stroke:var(--line)" stroke-opacity=".6"/>`).join('')
     + (pick == null ? '' : `<line x1="${cx(pick).toFixed(1)}" x2="${cx(pick).toFixed(1)}" y1="0" y2="${h}" style="stroke:var(--muted)"/>`);
