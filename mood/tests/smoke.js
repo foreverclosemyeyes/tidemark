@@ -431,7 +431,7 @@ function seed() {
   await page.reload(); await page.waitForSelector('h1');
   await page.click('[data-tab=trend]'); await page.click('[data-act=mode][data-mode=year]');
   check('년 보기: 한 칸이 한 주이고 선과 띠가 한 장에 그려짐', (await page.$$('.flow svg.flow-chart path')).length >= 2 && (await page.$$('.flow .yrow')).length >= 4 && (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 52);
-  check('약은 안 먹은 주만 그래프 아래 점으로', (await page.$$('.flow svg.flow-chart circle')).length >= 5 && (await text('.flowkeys')).includes('약 안 먹은 날') && !(await text('.flow')).includes('브린텔릭스'));
+  check('약은 안 먹은 주만 이름을 단 한 줄에 ×로', (await page.$$eval('.flow svg.flow-miss path', (els) => (els[0].getAttribute('d').match(/M/g) || []).length)) >= 5 && (await text('.flow .yrow >> nth=-1')).includes('약 안 먹은 날') && (await text('.flowkeys')).includes('약 안 먹은 날') && !(await text('.flow')).includes('브린텔릭스'));
   check('년 보기에서 미래로는 못 넘김', await page.isDisabled('[data-act=shift][data-step="1"]'));
   await page.click('[data-act=shift][data-step="-1"]');
   check('이전으로 넘기면 석 달 앞의 한 해가 나오고 다시 앞으로 올 수 있음', !(await page.isDisabled('[data-act=shift][data-step="1"]')));

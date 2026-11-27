@@ -422,7 +422,7 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
 
 /* 흐름 띠의 빈 칸 색 */
 .c0 { fill: var(--card2); }
-@media print { .c0 { fill: none; stroke: #ccc; } }
+@media print { .c0 { fill: #f1f1f1; } }
 
 /* 기록 화면: 여러 개를 누를 수 있는 딱지 (부작용, 술·운동) */
 .li.chips { flex-wrap: wrap; justify-content: flex-start; gap: 8px; padding: 13px 16px; }
@@ -461,7 +461,6 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
 .flowkeys button[aria-pressed=false] i { opacity: .3 !important; }
 .flowkeys i { display: inline-block; width: 16px; height: 2px; border-radius: 2px; background: var(--ink); vertical-align: middle; margin: -2px 6px 0 0; }
 .flowkeys i.dash { background: repeating-linear-gradient(90deg, var(--ink) 0 5px, transparent 5px 8px); opacity: .55; }
-.flowkeys i.dot { width: 7px; height: 7px; border-radius: 50%; background: none; border: 1.3px solid var(--ink); }
 .flowkeys i.bar { width: 1.5px; height: 12px; border-radius: 0; }
 .flow > .yrow:first-child { margin-top: 0; }
 /* AI가 쓴 풀이 */

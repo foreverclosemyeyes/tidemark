@@ -50,6 +50,6 @@ export function printoutHtml(days, since) {
       ${block(T('기분이 높았던 날 체크한 항목'), s.signs.map(count))}
       ${block(T('메모'), s.notes.map(([d, note]) => `<small>${shortDate(d)}</small>${esc(note)}`))}
     </div>
-    <footer class="po-foot">${T('본인이 휴대폰에 날마다 직접 적은 기록이에요 · 위아래로 같은 자리가 같은 날 · 띠는 진할수록 심했던 날 · 그래프 아래 동그라미는 약을 안 먹은 날')}<br>
+    <footer class="po-foot">${T('본인이 휴대폰에 날마다 직접 적은 기록이에요 · 위아래로 같은 자리가 같은 날 · 띠는 진할수록 심했던 날')}<br>
       ${T('“그 전”은 바로 앞의 같은 길이 기간의 평균')} · ${F('증상은 {0}~{1} 다섯 단계로 적은 것', LEVELS[0], LEVELS[4])}. ${DISCLAIMER}</footer>`;
 }
