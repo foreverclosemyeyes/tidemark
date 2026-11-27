@@ -366,6 +366,8 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
 @page { size: A4; margin: 14mm 13mm; }
 @media print {
   :root, :root[data-theme=light] { --bg: #fff; --text: #000; --ink: #000; --ink-inv: #fff; --muted: #555; --faint: #999; --line: #d8d8d8; --fill: #ededed; --card: transparent; --card2: transparent; --shadow: none; }
+  /* 종이의 그래프에서 에너지 · 자신감 선의 색 (기분은 고른 색) */
+  :root { --line2: #d9730d; --line3: #2f6fd6; }
   html, body { background: #fff !important; }
   body > *:not(#printout) { display: none !important; }
   body::before { display: none !important; }
@@ -421,8 +423,6 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
 
 
 /* 흐름 띠의 빈 칸 색 */
-.c0 { fill: var(--card2); }
-@media print { .c0 { fill: #f1f1f1; } }
 
 /* 기록 화면: 여러 개를 누를 수 있는 딱지 (부작용, 술·운동) */
 .li.chips { flex-wrap: wrap; justify-content: flex-start; gap: 8px; padding: 13px 16px; }

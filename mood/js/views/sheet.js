@@ -73,11 +73,12 @@ export function columns(start, count, span, src) {
 // guides: 세로 줄을 그을 칸 번호들 (주나 달이 바뀌는 자리). pick: 고른 칸 (없으면 null). scale: 글자 크기 배수.
 // 돌려주는 것: { keys: 무엇이 그려져 있는지 알려 주는 딱지들 (누르면 그 선·띠가 꺼지고 켜진다. 꺼 둔 것은 settings.flowOff에 남는다), body: 그림 }
 // 처음에는 전부 켜져 있고, 필요 없는 것을 사용자가 끈다 (사용자가 정함, 2026-11-25). 설정에서 꺼 둔 기록 항목은 딱지도 없다.
-export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, scale = 1 }) {
+// colors: 에너지·자신감 선을 점선·흐린 선 대신 다른 색으로 그린다 (종이용. 의사가 읽을 때는 색이 덜 헷갈린다고 사용자가 정함, 2026-11-27. 화면은 색 하나 그대로).
+export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, scale = 1, colors = false }) {
   const hidden = db.settings.flowOff || [], on = (k) => !hidden.includes(k);
   const n = cols.length, AX = Math.round(22 * scale), W = width - AX, col = W / n, cx = (i) => col * (i + 0.5);
   const fs = (10 * scale).toFixed(1), muted = 'style="fill:var(--muted)"', accent = tone('mood', 10) || 'var(--ink)';
-  const svg = (h, inner, cls = '') => `<svg${cls ? ` class="${cls}"` : ''} width="${width}" height="${h}" viewBox="0 0 ${width} ${h}">${inner}</svg>`;
+  const svg = (h, inner, cls = '') => `<svg${cls ? ` class="${cls}"` : ''} data-n="${n}" width="${width}" height="${h}" viewBox="0 0 ${width} ${h}">${inner}</svg>`;
   const vlines = (h) => guides.map((i) => `<line x1="${(col * i).toFixed(1)}" x2="${(col * i).toFixed(1)}" y1="0" y2="${h}" style="stroke:var(--line)" stroke-opacity=".6"/>`).join('')
     + (pick == null ? '' : `<line x1="${cx(pick).toFixed(1)}" x2="${cx(pick).toFixed(1)}" y1="0" y2="${h}" style="stroke:var(--muted)"/>`);
   const grid = (ticks, y) => ticks.map(([v, label]) => `<line x1="0" x2="${W}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" style="stroke:var(--line)"/>
@@ -93,8 +94,11 @@ export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, 
   // 1. 기분·에너지·자신감 (0~10). 약을 바꾼 날과 진료일은 세로선.
   const H = 120, yS = (v) => 6 + (1 - v / 10) * (H - 12);
   const anyMissed = itemOn('meds') && cols.some((c) => c.missed), anyLog = cols.some((c) => c.log.length);
-  const LINES = [['conf', T('자신감'), 1.4, 'style="stroke:var(--ink)" stroke-opacity=".55" stroke-dasharray="5 4"', '<i class="dash"></i>'],
-    ['energy', T('에너지'), 1.4, 'style="stroke:var(--ink)" stroke-opacity=".55"', '<i style="opacity:.55"></i>'],
+  // 색으로 그릴 때도 굵기는 다르게 둔다 (흑백으로 뽑아도 기분 선이 구분되게)
+  const LINES = [colors ? ['conf', T('자신감'), 1.5, 'style="stroke:var(--line3)"', '<i style="background:var(--line3)"></i>']
+    : ['conf', T('자신감'), 1.4, 'style="stroke:var(--ink)" stroke-opacity=".55" stroke-dasharray="5 4"', '<i class="dash"></i>'],
+  colors ? ['energy', T('에너지'), 1.9, 'style="stroke:var(--line2)"', '<i style="background:var(--line2)"></i>']
+    : ['energy', T('에너지'), 1.4, 'style="stroke:var(--ink)" stroke-opacity=".55"', '<i style="opacity:.55"></i>'],
     ['mood', T('기분'), 2.6, `style="stroke:${accent}"`, `<i style="background:${accent};height:3px"></i>`]].filter(([k]) => itemOn(k));
   const marks = !on('log') ? '' : cols.map((c, i) => c.log.map((x) => `<line x1="${cx(i).toFixed(1)}" x2="${cx(i).toFixed(1)}" y1="0" y2="${H}" style="stroke:var(--${x.kind === 'med' ? 'ink' : 'muted'})" stroke-opacity="${x.kind === 'med' ? 0.8 : 0.5}"${x.kind === 'med' ? '' : ' stroke-dasharray="3 3"'}/>`).join('')).join('');
   const shown = LINES.filter(([k]) => on(k));
@@ -105,28 +109,38 @@ export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, 
   const SH = 54, yZ = (m) => 4 + (1 - Math.min(m, 720) / 720) * (SH - 8);
   const sleep = itemOn('sleep') && on('sleep') ? `<div class="yrow"><span>${T('수면')}</span></div>${svg(SH, `${vlines(SH)}${grid([[0, '0'], [360, '6'], [720, '12']], yZ)}${line('sleep', yZ, 2, 'style="stroke:var(--ink)"')}`)}` : '';
 
-  // 3. 띠: 칸마다 한 조각, 값이 클수록 진하다. 스트레스·불안은 늘 있고, 나머지는 이 기간에 한 번이라도 있었을 때만.
-  // 낮은 단계는 아주 옅게 해서 높았던 날만 눈에 들어오게 하고, 값이 없는 칸은 테두리 없이 바탕만 둔다
-  // (칸마다 테두리를 친 알약 모양이 줄줄이 있으니 지저분하다고 함, 2026-11-27).
-  const SH2 = 10, gap = col > 10 ? 2 : 0.6, cw = Math.max(1, col - gap), TONE = [0, 0.14, 0.32, 0.62, 1];
+  // 3. 증상 줄: 위의 선들과 같은 말투로, 단계(0~4)를 부드러운 선과 그 아래 옅은 면으로 그린다. 높이 솟은 곳이 심했던 때다.
+  // 스트레스·불안은 늘 있고, 나머지는 이 기간에 한 번이라도 있었을 때만.
+  // (칸마다 네모를 놓고 진하기나 높이로 구분해 봤는데 못생겼다고 함, 2026-11-27.)
+  const SH2 = 24, yL = (v) => SH2 - 1.5 - (v / 4) * (SH2 - 4);
   const pickLine = pick == null ? '' : `<line x1="${cx(pick).toFixed(1)}" x2="${cx(pick).toFixed(1)}" y1="0" y2="${SH2}" style="stroke:var(--muted)"/>`;
-  const strip = (name, levelOf) => `<div class="yrow"><span>${name}</span>${svg(SH2, cols.map((c, i) => { const v = levelOf(c); return `<rect x="${(col * i + gap / 2).toFixed(1)}" y="0" width="${cw.toFixed(1)}" height="${SH2}" rx="${Math.min(2, cw / 3).toFixed(1)}" ${v
-    ? `style="fill:var(--ink)" fill-opacity="${TONE[v]}"` : 'class="c0"'}/>`; }).join('') + pickLine, 'flow-strip')}</div>`;
+  const strip = (name, levelOf) => {
+    const d = smoothPath(cols.map((c, i) => [cx(i), yL(levelOf(c) || 0)]));
+    return `<div class="yrow"><span>${name}</span>${svg(SH2, `<line x1="0" x2="${W}" y1="${SH2 - 0.5}" y2="${SH2 - 0.5}" style="stroke:var(--line)"/>
+      <path d="${d}L${cx(n - 1).toFixed(1)} ${SH2}L${cx(0).toFixed(1)} ${SH2}Z" style="fill:var(--ink)" fill-opacity=".16"/>
+      <path d="${d}" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--ink)" stroke-opacity=".8"/>${pickLine}`, 'flow-strip')}</div>`;
+  };
+  // 생리처럼 "있었다 · 없었다"만 있는 것은 이어진 날들을 가는 줄 하나로 잇는다
+  const span = (name, has) => {
+    const runs = [];
+    cols.forEach((c, i) => { if (!has(c)) return; const last = runs[runs.length - 1]; if (last && last[1] === i - 1) last[1] = i; else runs.push([i, i]); });
+    return `<div class="yrow"><span>${name}</span>${svg(8, `<line x1="0" x2="${W}" y1="4" y2="4" style="stroke:var(--line)"/>${runs.map(([a, b]) => `<line x1="${(col * a + 1.5).toFixed(1)}" x2="${Math.max(col * a + 1.6, col * (b + 1) - 1.5).toFixed(1)}" y1="4" y2="4" stroke-width="5" stroke-linecap="round" style="stroke:var(--ink)" stroke-opacity=".7"/>`).join('')}${pickLine}`, 'flow-span')}</div>`;
+  };
   // 약을 안 먹은 날: 띠들과 같은 자리에 이름을 단 한 줄로, 그 칸에 ×
   // (그래프 바로 아래에 이름 없이 동그라미만 떠 있어서 무엇인지 알기 어려웠다)
   const xr = Math.max(1.8, Math.min(3.2, col * 0.32));
-  const cross = (x) => `M${(x - xr).toFixed(1)} ${(SH2 / 2 - xr).toFixed(1)}l${(xr * 2).toFixed(1)} ${(xr * 2).toFixed(1)}m0 ${(-xr * 2).toFixed(1)}l${(-xr * 2).toFixed(1)} ${(xr * 2).toFixed(1)}`;
-  const missed = anyMissed && on('missed') ? `<div class="yrow"><span>${T('약 안 먹은 날')}</span>${svg(SH2, `<path d="${cols.map((c, i) => (c.missed ? cross(cx(i)) : '')).join('')}" fill="none" stroke-width="1.5" stroke-linecap="round" style="stroke:var(--ink)"/>${pickLine}`, 'flow-miss')}</div>` : '';
+  const MH = 10, cross = (x) => `M${(x - xr).toFixed(1)} ${(MH / 2 - xr).toFixed(1)}l${(xr * 2).toFixed(1)} ${(xr * 2).toFixed(1)}m0 ${(-xr * 2).toFixed(1)}l${(-xr * 2).toFixed(1)} ${(xr * 2).toFixed(1)}`;
+  const missed = anyMissed && on('missed') ? `<div class="yrow"><span>${T('약 안 먹은 날')}</span>${svg(MH, `<path d="${cols.map((c, i) => (c.missed ? cross(cx(i)) : '')).join('')}" fill="none" stroke-width="1.5" stroke-linecap="round" style="stroke:var(--ink)"/>${pickLine}`, 'flow-miss')}</div>` : '';
   const seen = (f) => cols.some((c) => f(c));
-  // [열쇠, 이름, 칸의 값] 가운데 이 기간에 나올 것들
+  // [열쇠, 이름, 칸의 값, 그리는 법(없으면 막대)] 가운데 이 기간에 나올 것들
   const STRIPS = [
     ...SYMPTOMS.filter(([k]) => itemOn(k) && (k !== 'si' || seen((c) => c.si))).map(([k, name]) => [k, name, (c) => c[k]]),
     ...(itemOn('panic') && seen((c) => c.panic) ? [['panic', T('공황'), (c) => c.panic]] : []),
     ...(itemOn('psy') && seen((c) => c.psy) ? [['psy', T('정신병적 증상'), (c) => c.psy]] : []),
-    ...(itemOn('period') && seen((c) => c.period) ? [['period', T('생리'), (c) => c.period]] : []),
+    ...(itemOn('period') && seen((c) => c.period) ? [['period', T('생리'), (c) => c.period, span]] : []),
     ...customDefs().filter((d) => seen((c) => c.custom[d.id])).map((d) => [`c:${d.id}`, esc(d.name), (c) => c.custom[d.id]]),
   ];
-  const strips = STRIPS.filter(([k]) => on(k)).map(([, name, f]) => strip(name, f)).join('');
+  const strips = STRIPS.filter(([k]) => on(k)).map(([, name, f, draw = strip]) => draw(name, f)).join('');
 
   // 딱지: 선은 견본과 함께, 나머지는 이름만. 꺼 둔 것은 흐리게.
   const chip = (k, name, mark = '') => `<button type="button" data-act="flowToggle" data-k="${esc(k)}" aria-pressed="${on(k)}">${mark}${name}</button>`;

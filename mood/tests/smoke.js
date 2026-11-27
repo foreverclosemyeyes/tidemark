@@ -227,7 +227,7 @@ function seed() {
   check('최근 7일 읽기: 들뜬 날이 이어지면 겹치는 점을 근거와 함께 보여 줌', (await text('.state')).includes('경조증·조증 때의 모습과 많이 겹쳐요') && (await text('.state')).includes('경조증 기준 증상 7가지 중') && (await text('.state')).includes('진단이 아니에요'));
   await page.click('[data-tab=trend]');
   check('주 흐름: 한 장에 기분·에너지 선, 잠, 띠가 같은 가로축에 (항목마다 따로 있던 카드는 없음)', (await page.$$('#app .flow')).length === 1 && (await page.$$('.flow svg.flow-chart path')).length === 3
-    && (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 7 && (await text('.flow')).includes('스트레스') && !(await page.$('.mcard')));
+    && (await page.$eval('.flow svg.flow-strip', (el) => Number(el.dataset.n))) === 7 && (await text('.flow')).includes('스트레스') && !(await page.$('.mcard')));
   // 선과 띠는 하나씩 끌 수 있고, 꺼 둔 것은 남는다
   await page.click('.flowkeys [data-k=conf]'); await page.click('.flowkeys [data-k=stress]');
   check('딱지를 누르면 그 선·띠가 꺼짐 (자신감, 스트레스)', (await page.$$('.flow svg.flow-chart path')).length === 2 && !(await text('.flow')).includes('스트레스') && (await store()).settings.flowOff.join() === 'conf,stress'
@@ -239,12 +239,12 @@ function seed() {
   check('약은 띠로 그리지 않음', !(await text('.flow')).includes('브린텔릭스'));
   check('흐름 그림이 카드 밖으로 안 넘침', await page.evaluate(() => [...document.querySelectorAll('.flow svg')].every((el) => el.getBoundingClientRect().right <= el.closest('.card').getBoundingClientRect().right + 0.5)));
   await page.click('[data-mode=month]');
-  check('월 흐름: 하루가 한 칸', [28, 29, 30, 31].includes(await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)));
+  check('월 흐름: 하루가 한 칸', [28, 29, 30, 31].includes(await page.$eval('.flow svg.flow-strip', (el) => Number(el.dataset.n))));
   const box = await page.$eval('.flow svg.flow-chart', (x) => { const r = x.getBoundingClientRect(); return [r.left, r.top]; });
   await page.mouse.click(box[0] + 4, box[1] + 30);
   check('날짜를 누르면 그날 값이 뜸', await page.isVisible('.pickbar') && /기분 \d/.test(await text('.pickbar')));
   await page.click('[data-mode=half]');
-  check('6달 흐름: 26주가 한 주 한 칸씩', (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 26 && await page.isDisabled('[data-act=shift][data-step="1"]') && (await text('.segc')).replace(/\s/g, '') === '주1달6달12달');
+  check('6달 흐름: 26주가 한 주 한 칸씩', (await page.$eval('.flow svg.flow-strip', (el) => Number(el.dataset.n))) === 26 && await page.isDisabled('[data-act=shift][data-step="1"]') && (await text('.segc')).replace(/\s/g, '') === '주1달6달12달');
   await page.click('[data-mode=month]');
   await page.click('[data-mode=week]');
   check('보기를 바꿔도 오늘이 든 기간을 보여 줌 (월 → 주)', await page.isDisabled('[data-act=shift][data-step="1"]'));
@@ -430,7 +430,7 @@ function seed() {
   });
   await page.reload(); await page.waitForSelector('h1');
   await page.click('[data-tab=trend]'); await page.click('[data-act=mode][data-mode=year]');
-  check('년 보기: 한 칸이 한 주이고 선과 띠가 한 장에 그려짐', (await page.$$('.flow svg.flow-chart path')).length >= 2 && (await page.$$('.flow .yrow')).length >= 4 && (await page.$$eval('.flow svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 52);
+  check('년 보기: 한 칸이 한 주이고 선과 띠가 한 장에 그려짐', (await page.$$('.flow svg.flow-chart path')).length >= 2 && (await page.$$('.flow .yrow')).length >= 4 && (await page.$eval('.flow svg.flow-strip', (el) => Number(el.dataset.n))) === 52);
   check('약은 안 먹은 주만 이름을 단 한 줄에 ×로', (await page.$$eval('.flow svg.flow-miss path', (els) => (els[0].getAttribute('d').match(/M/g) || []).length)) >= 5 && (await text('.flow .yrow >> nth=-1')).includes('약 안 먹은 날') && (await text('.flowkeys')).includes('약 안 먹은 날') && !(await text('.flow')).includes('브린텔릭스'));
   check('년 보기에서 미래로는 못 넘김', await page.isDisabled('[data-act=shift][data-step="1"]'));
   await page.click('[data-act=shift][data-step="-1"]');
@@ -484,7 +484,7 @@ function seed() {
   // 인쇄용 한 장: 종이 크기에 맞춘 배치가 따로 채워지고, 화면에서는 안 보인다
   await page.click('[data-tab=clinic]');
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
-  check('인쇄할 때 종이용 한 장이 채워짐 (머리말 · 숫자 칸 · 그림)', (await page.$$('#printout .po-stat')).length === 4 && !!(await page.$('#printout .po-head h1')) && !!(await page.$('#printout svg.flow-chart')) && (await page.$$eval('#printout svg.flow-strip >> nth=0 >> rect', (els) => els.length)) === 14);
+  check('인쇄할 때 종이용 한 장이 채워짐 (머리말 · 숫자 칸 · 그림)', (await page.$$('#printout .po-stat')).length === 4 && !!(await page.$('#printout .po-head h1')) && !!(await page.$('#printout svg.flow-chart')) && (await page.$eval('#printout svg.flow-strip', (el) => Number(el.dataset.n))) === 14 && /--line[23]/.test(await page.$eval('#printout svg.flow-chart', (el) => el.innerHTML) + await page.$eval('#printout .flowkeys', (el) => el.innerHTML)));
   check('종이용 한 장은 화면에서는 안 보임', await page.$eval('#printout', (x) => getComputedStyle(x).display === 'none'));
   await page.emulateMedia({ media: 'print' });
   check('인쇄에서는 종이용 한 장만 보임', await page.evaluate(() => getComputedStyle(document.querySelector('#printout')).display === 'block' && getComputedStyle(document.querySelector('#app')).display === 'none'));

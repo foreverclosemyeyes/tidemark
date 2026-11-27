@@ -21,7 +21,7 @@ export function printoutHtml(days, since) {
   const cols = columns(s.dates[0], s.dates.length, 1, flowSource());
   const daily = days <= DAILY, mondays = cols.map((_, i) => i).filter((i) => parse(cols[i].start).getDay() === 1);
   const labels = (daily ? cols.map((_, i) => i) : mondays).map((i) => [i, shortDate(cols[i].start), daily ? 'mid' : 'left']);
-  const sheet = sheetHtml({ cols, width: PAGE, labels, guides: daily ? [] : mondays.filter(Boolean) });
+  const sheet = sheetHtml({ cols, width: PAGE, labels, guides: daily ? [] : mondays.filter(Boolean), colors: true });
   // 맨 위 숫자 칸: 평균을 크게, 그 아래 가장 낮은 날–높은 날과 바로 앞 같은 길이 기간의 평균
   const stat = (name, st, fmt) => `<div class="po-stat"><span>${name}</span><b>${st ? fmt(st.avg) : '–'}</b><small>${st ? `${fmt(st.min)} – ${fmt(st.max)}` : T('기록 없음')}</small>${
     st && st.prev != null ? `<small>${F('그 전 {0}', fmt(st.prev))}</small>` : ''}</div>`;
@@ -50,6 +50,6 @@ export function printoutHtml(days, since) {
       ${block(T('기분이 높았던 날 체크한 항목'), s.signs.map(count))}
       ${block(T('메모'), s.notes.map(([d, note]) => `<small>${shortDate(d)}</small>${esc(note)}`))}
     </div>
-    <footer class="po-foot">${T('본인이 휴대폰에 날마다 직접 적은 기록이에요 · 위아래로 같은 자리가 같은 날 · 띠는 진할수록 심했던 날')}<br>
+    <footer class="po-foot">${T('본인이 휴대폰에 날마다 직접 적은 기록이에요 · 위아래로 같은 자리가 같은 날 · 증상은 높이 솟을수록 심했던 날')}<br>
       ${T('“그 전”은 바로 앞의 같은 길이 기간의 평균')} · ${F('증상은 {0}~{1} 다섯 단계로 적은 것', LEVELS[0], LEVELS[4])}. ${DISCLAIMER}</footer>`;
 }

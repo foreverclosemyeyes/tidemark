@@ -52,8 +52,8 @@ export function viewTrend() {
   const pickText = !pickE ? '' : [pickE.mood != null && itemOn('mood') ? `${T('기분')} ${pickE.mood}` : '', pickE.energy != null && itemOn('energy') ? `${T('에너지')} ${pickE.energy}` : '',
     pickE.sleepMin != null && itemOn('sleep') ? durText(pickE.sleepMin) : ''].filter(Boolean).join(' · ');
   const title = mode === 'week' ? `${md(sD)} – ${md(eD)}` : mode === 'month' ? monthTitle(sD) : `${ym(sD)} – ${ym(eD)}`;
-  const foot = `${byWeek ? T('한 칸이 한 주예요. 선은 그 주의 평균이고, 띠는 진할수록 심했던 주예요. 아래 숫자는 달이에요.')
-    : T('위아래로 같은 자리가 같은 날이에요. 띠는 진할수록 심했던 날이고, 날짜를 누르면 그날 값을 볼 수 있어요.')} ${T('위의 이름을 누르면 필요 없는 선이나 띠를 끌 수 있어요.')}`;
+  const foot = `${byWeek ? T('한 칸이 한 주예요. 선은 그 주의 평균이고, 증상은 높이 솟을수록 심했던 주예요. 아래 숫자는 달이에요.')
+    : T('위아래로 같은 자리가 같은 날이에요. 증상은 높이 솟을수록 심했던 날이고, 날짜를 누르면 그날 값을 볼 수 있어요.')} ${T('위의 이름을 누르면 필요 없는 선이나 띠를 끌 수 있어요.')}`;
   const sheet = sheetHtml({ cols, width, labels, guides, pick, scale: fontScale() });
   app.innerHTML = `
     <header class="top"><div><div class="over">${F('기록 {0}일', days)}</div><h1>${T('흐름')}</h1></div>
