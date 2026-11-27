@@ -377,7 +377,12 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
   .po-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
   .po-brand { text-align: right; font-weight: 600; font-size: 12px; letter-spacing: .04em; }
   .po-brand small { display: block; font-weight: 400; letter-spacing: 0; color: var(--muted); font-size: 10.5px; margin-top: 2px; }
-  .po-main { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; align-items: start; margin-top: 12px; }
+  /* 두 단은 grid가 아니라 float로 나눈다 (아이폰 사파리는 인쇄할 때 grid 안의 내용을 쪽에 나누어 담지 못해 비거나 잘릴 수 있다) */
+  .po-main { margin-top: 12px; }
+  .po-main::after { content: ''; display: block; clear: both; }
+  .po-figs { float: left; width: 58.5%; }
+  .po-side { float: right; width: 39%; }
+  .po-foot { clear: both; }
   .po-talk { margin: 0 0 10px; padding: 9px 14px 10px; background: var(--fill); border-radius: 10px; break-inside: avoid; }
   .po-talk h3 { font-size: 11px; font-weight: 700; margin: 0 0 4px; }
   .po-talk ol { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; }

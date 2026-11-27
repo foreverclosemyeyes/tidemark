@@ -1,5 +1,6 @@
 // 시작점: 누르기·입력 처리와 앱 시작
 import { aiSummary } from './analysis.js';
+import { VERSION } from './config.js';
 import { addDays, today } from './dates.js';
 import { $, app, closeSheet, copyText, enterApp, sheet, sheetOpen, toTop, toast } from './dom.js';
 import { exportData, giveFile, hasAlarms, importData, makeIcs, remind, snoozeBackup } from './files.js';
@@ -228,7 +229,11 @@ const actions = {
     $('#c-note').focus();
   },
   clinicNoteDel: (el) => { clinicData().notes.splice(Number(el.dataset.i), 1); save(); render(); },
-  printSummary: () => { fillPrintout(); window.print(); },
+  // 종이용 한 장을 채우고 인쇄 화면을 연다. 채우다가 문제가 생기면 아무 일도 안 일어난 것처럼 보이지 않게 무엇이 문제인지 알린다.
+  printSummary: () => {
+    try { fillPrintout(); } catch (e) { toast(`${T('요약을 만들지 못했어요')} (${VERSION}: ${e.message})`); return; }
+    window.print();
+  },
   copySummary: async () => { await copyText(summaryText(clinicDays())); toast(T('복사했어요')); },
   lang: (el) => { db.settings.lang = el.dataset.lang; if (save()) location.reload(); },
   size: (el) => { db.settings.size = el.dataset.size; save(); applyFont(); render(); openSettings(); },
