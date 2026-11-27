@@ -271,6 +271,7 @@ const DICT = {
   '취소': 'Cancel',
   '완료': 'Done',
   '설정': 'Settings',
+  '범위 {0} – {1}': 'range {0} – {1}',
   '요약을 만들지 못했어요': 'Could not build the summary',
   '본인이 휴대폰에 날마다 직접 적은 기록이에요 · 위아래로 같은 자리가 같은 날 · 증상은 높이 솟을수록 심했던 날': 'Self-recorded daily on the patient\'s phone · the same horizontal position is the same day · higher symptom curves mean worse days',
   '한 칸이 한 주예요. 선은 그 주의 평균이고, 증상은 높이 솟을수록 심했던 주예요. 아래 숫자는 달이에요.': 'Each column is a week. Lines are that week’s average, and higher symptom curves mean a worse week. The numbers below are months.',

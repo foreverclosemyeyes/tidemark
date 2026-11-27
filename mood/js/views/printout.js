@@ -24,7 +24,7 @@ export function printoutHtml(days, since) {
   const labels = (daily ? cols.map((_, i) => i) : mondays).map((i) => [i, shortDate(cols[i].start), daily ? 'mid' : 'left']);
   const sheet = sheetHtml({ cols, width: PAGE, labels, guides: daily ? [] : mondays.filter(Boolean), colors: true, tall: true, callouts: true });
   // 맨 위 숫자 칸: 평균을 크게, 그 아래 가장 낮은 날–높은 날과 바로 앞 같은 길이 기간의 평균
-  const stat = (name, st, fmt) => `<div class="po-stat"><span>${name}</span><b>${st ? fmt(st.avg) : '–'}</b><small>${st ? `${fmt(st.min)} – ${fmt(st.max)}` : T('기록 없음')}</small>${
+  const stat = (name, st, fmt) => `<div class="po-stat"><span>${name}</span><b>${st ? fmt(st.avg) : '–'}</b><small>${st ? F('범위 {0} – {1}', fmt(st.min), fmt(st.max)) : T('기록 없음')}</small>${
     st && st.prev != null ? `<small>${F('그 전 {0}', fmt(st.prev))}</small>` : ''}</div>`;
   const num = (x) => (Number.isInteger(x) ? String(x) : one(x)), dur = (m) => durText(Math.round(m));
   const stats = [['mood', T('기분')], ['energy', T('에너지')], ['conf', T('자신감')]].filter(([k]) => itemOn(k)).map(([k, name]) => stat(name, s[k], num)).join('')
@@ -39,11 +39,11 @@ export function printoutHtml(days, since) {
     <header class="po-head"><div><h1>${T('진료용 요약')}</h1>
       <p>${since ? F('지난 진료 {0} → 오늘 {1}', first, last) : `${first} – ${last}`} · ${F('기록 {0}일 / {1}일', s.got.length, s.dates.length)}</p></div>
       <div class="po-brand">Tidemark<small>${longDate(today())}</small></div></header>
+    ${stats ? `<div class="po-stats">${stats}</div>` : ''}
     <div class="po-main">
       <div class="po-figs"><div class="flowkeys">${sheet.keys}</div>${sheet.body}</div>
       <div class="po-side">
         ${c.notes.length ? `<section class="po-talk"><h3>${T('진료 때 말하고 싶은 것')}</h3><ol>${c.notes.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></section>` : ''}
-        ${stats ? `<div class="po-stats">${stats}</div>` : ''}
         ${itemOn('meds') ? block(T('약 (먹은 날)'), r.meds.map(([name, v]) => [esc(name), v])) : ''}
         ${block(T('진료 · 약 변경 기록'), log.map((x) => `<small>${shortDate(x.date)} · ${kindName(x.kind)}</small>${esc(x.text || '')}`))}
         ${itemOn('fx') ? block(T('부작용'), s.fx.map(count)) : ''}
