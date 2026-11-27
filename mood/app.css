@@ -363,7 +363,7 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
 /* 인쇄·PDF: 요약 부분만, 흰 바탕에 검은 글씨로 (누르는 것들은 뺀다) */
 /* 인쇄·PDF: 화면은 전부 숨기고 종이용 한 장(#printout, views/printout.js)만 내보낸다 */
 #printout { display: none; }
-@page { size: A4; margin: 14mm 13mm; }
+@page { size: A4 landscape; margin: 10mm 13mm; }
 @media print {
   :root, :root[data-theme=light] { --bg: #fff; --text: #2a2a2a; --ink: #3a3a3a; --ink-inv: #fff; --muted: #707070; --faint: #aaa; --line: #e3e3e3; --fill: #f5f5f5; --card: transparent; --card2: transparent; --shadow: none; }
   /* 종이의 그래프에서 기분 · 에너지 · 자신감 선의 색 (화면보다 차분하게) */
@@ -377,23 +377,22 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
   .po-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
   .po-brand { text-align: right; font-weight: 600; font-size: 12px; letter-spacing: .04em; }
   .po-brand small { display: block; font-weight: 400; letter-spacing: 0; color: var(--muted); font-size: 10.5px; margin-top: 2px; }
-  .po-talk { margin: 12px 0 0; padding: 9px 14px 10px; background: var(--fill); border-radius: 10px; break-inside: avoid; }
+  .po-main { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; align-items: start; margin-top: 12px; }
+  .po-talk { margin: 0 0 10px; padding: 9px 14px 10px; background: var(--fill); border-radius: 10px; break-inside: avoid; }
   .po-talk h3 { font-size: 11px; font-weight: 700; margin: 0 0 4px; }
   .po-talk ol { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; }
   .po-talk li { overflow-wrap: anywhere; }
-  .po-stats { display: flex; gap: 10px; margin: 12px 0 2px; }
-  .po-stat { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px 8px; }
+  .po-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 12px; }
+  .po-stat { border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px 8px; }
   .po-stat span { display: block; color: var(--muted); font-size: 10.5px; }
   .po-stat b { display: block; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
   .po-stat small { display: block; color: var(--muted); font-size: 10px; }
-  .po-figs { margin-top: 12px; }
   .flowkeys { margin: 0 0 6px; gap: 4px 12px; }
   .flowkeys button { padding: 0; background: none; color: var(--muted); font-size: 10.5px; }
   .flowkeys button[aria-pressed=false] { display: none; }
   .po-figs svg { display: block; width: 100%; height: auto; overflow: visible; font-family: inherit; }
   .po-figs svg + svg { margin-top: 14px; }
   .po-figs svg, .po-block { break-inside: avoid; }
-  .po-cols { columns: 2; column-gap: 26px; margin-top: 14px; }
   .po-block { margin: 0 0 11px; }
   .po-block h3 { font-size: 11px; font-weight: 700; margin: 0 0 4px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
   .po-row { display: flex; justify-content: space-between; gap: 12px; padding: 2.5px 0; }
@@ -401,7 +400,7 @@ button.lk.talk { text-align: left; color: var(--text); font: inherit; }
   .po-row span:last-child { color: var(--muted); text-align: right; }
   .po-line { padding: 2.5px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
   .po-line small { color: var(--muted); margin-right: 6px; font-size: 10.5px; }
-  .po-foot { margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9.5px; line-height: 1.5; }
+  .po-foot { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9.5px; line-height: 1.5; }
 }
 
 /* 메모 모아 보기 */

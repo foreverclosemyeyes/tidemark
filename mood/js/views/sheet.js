@@ -64,6 +64,7 @@ export function columns(start, count, span, src) {
       start: dates[0], end: dates[span - 1], n: list.length, mood: mean('mood'), energy: mean('energy'), conf: mean('conf'), sleep: mean('sleepMin'),
       stress: level('stress'), anx: level('anx'), si: top((e) => e.si), panic: Math.min(4, top((e) => e.panic)), psy: top((e) => e.psy), period: list.some((e) => e.period) ? 3 : 0,
       custom: Object.fromEntries(customs.map((d) => [d.id, top((e) => customLevel(d, (e.custom || {})[d.id]))])),
+      note: span === 1 && list[0] ? list[0].note || '' : '',   // 하루가 한 칸일 때만 그날 메모
       missed: dates.filter(src.missed).length, log: src.log.filter((x) => x.date >= dates[0] && x.date <= dates[span - 1]),
     };
   });
@@ -75,7 +76,8 @@ export function columns(start, count, span, src) {
 // 처음에는 전부 켜져 있고, 필요 없는 것을 사용자가 끈다 (사용자가 정함, 2026-11-25). 설정에서 꺼 둔 기록 항목은 딱지도 없다.
 // colors: 에너지·자신감 선을 점선·흐린 선 대신 다른 색으로 그린다 (종이용. 의사가 읽을 때는 색이 덜 헷갈린다고 사용자가 정함, 2026-11-27. 화면은 색 하나 그대로).
 // tall: 그림을 위아래로 키우고 가로 눈금을 촘촘히 긋는다 (종이용. 종이는 너비가 넓어서 화면과 같은 높이로 그리면 납작해 읽기 어렵다고 함, 2026-11-27).
-export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, scale = 1, colors = false, tall = false }) {
+// callouts: 기분이 갑자기 내려간 날에 메모가 있으면 그 메모를 짧게 줄여 그래프 위에 화살표와 함께 띄운다 (종이용. 사용자가 요청, 2026-11-27).
+export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, scale = 1, colors = false, tall = false, callouts = false }) {
   const hidden = db.settings.flowOff || [], on = (k) => !hidden.includes(k);
   const n = cols.length, AX = Math.round(22 * scale), W = width - AX, col = W / n, cx = (i) => col * (i + 0.5);
   const fs = (10 * scale).toFixed(1), muted = 'style="fill:var(--muted)"', accent = colors ? 'var(--line1)' : tone('mood', 10) || 'var(--ink)';
@@ -93,7 +95,7 @@ export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, 
   const xText = (y) => labels.map(([i, text, at]) => `<text x="${(at === 'mid' ? cx(i) : col * i).toFixed(1)}" y="${y}" font-size="${fs}"${at === 'mid' ? ' text-anchor="middle"' : ''} ${muted}>${text}</text>`).join('');
 
   // 1. 기분·에너지·자신감 (0~10). 약을 바꾼 날과 진료일은 세로선.
-  const H = tall ? 230 : 120, yS = (v) => 6 + (1 - v / 10) * (H - 12);
+  const H = tall ? 172 : 120, yS = (v) => 6 + (1 - v / 10) * (H - 12);
   const anyMissed = itemOn('meds') && cols.some((c) => c.missed), anyLog = cols.some((c) => c.log.length);
   // 색으로 그릴 때도 굵기는 다르게 둔다 (흑백으로 뽑아도 기분 선이 구분되게)
   const LINES = [colors ? ['conf', T('자신감'), 1.5, 'style="stroke:var(--line3)"', '<i style="background:var(--line3)"></i>']
@@ -103,17 +105,35 @@ export function sheetHtml({ cols, width, labels = [], guides = [], pick = null, 
     ['mood', T('기분'), 2.6, `style="stroke:${accent}"`, `<i style="background:${accent};height:3px"></i>`]].filter(([k]) => itemOn(k));
   const marks = !on('log') ? '' : cols.map((c, i) => c.log.map((x) => `<line x1="${cx(i).toFixed(1)}" x2="${cx(i).toFixed(1)}" y1="0" y2="${H}" style="stroke:var(--${x.kind === 'med' ? 'ink' : 'muted'})" stroke-opacity="${x.kind === 'med' ? 0.8 : 0.5}"${x.kind === 'med' ? '' : ' stroke-dasharray="3 3"'}/>`).join('')).join('');
   const shown = LINES.filter(([k]) => on(k));
+  // 기분이 갑자기 내려간 날의 메모. "갑자기"는 앞의 기록(사흘 안)보다 DROP 이상 낮아진 날로 본다 (근거 없이 내가 정한 기준).
+  // 많이 내려간 날부터 MAX_NOTES개까지, 서로 겹치지 않는 것만 띄운다. 글은 메모의 첫 마디만 짧게.
+  const DROP = 2, MAX_NOTES = 4, NOTE_LEN = 14;
+  const brief = (note) => { const s = note.split(/[.\n!?,·]/)[0].trim(); return s.length > NOTE_LEN ? `${s.slice(0, NOTE_LEN - 1)}…` : s; };
+  const drops = !callouts || !shown.some(([k]) => k === 'mood') ? [] : cols.map((c, i) => {
+    if (c.mood == null || !c.note) return null;
+    const before = cols.slice(Math.max(0, i - 3), i).reverse().find((p) => p.mood != null);
+    return before && before.mood - c.mood >= DROP ? { i, by: before.mood - c.mood, text: brief(c.note) } : null;
+  }).filter((d) => d && d.text).sort((a, b) => b.by - a.by);
+  const fsn = 10 * scale, noteW = (t) => t.length * fsn * 0.95 + 12, shownNotes = [];
+  drops.forEach((d) => { if (shownNotes.length < MAX_NOTES && shownNotes.every((o) => Math.abs(cx(o.i) - cx(d.i)) > (noteW(o.text) + noteW(d.text)) / 2 + 6)) shownNotes.push(d); });
+  // 내려간 점 바로 아래에 위를 가리키는 화살표, 그 아래에 글 (내려간 날의 아래쪽이 대개 비어 있다)
+  const notes = shownNotes.map(({ i, text }) => {
+    const x = cx(i), y = yS(cols[i].mood), w = noteW(text), top = Math.min(H - 20, y + 20), tx = Math.max(w / 2 + 1, Math.min(W - w / 2 - 1, x));
+    return `<g class="flow-note"><path d="M${x.toFixed(1)} ${(top - 1).toFixed(1)}V${(y + 7).toFixed(1)}m-3 3.5l3 -4.5l3 4.5" fill="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--muted)"/>
+      <rect x="${(tx - w / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${(fsn + 7).toFixed(1)}" rx="4" style="fill:var(--bg);stroke:var(--line)"/>
+      <text x="${tx.toFixed(1)}" y="${(top + fsn + 1.5).toFixed(1)}" font-size="${fsn.toFixed(1)}" text-anchor="middle" style="fill:var(--text)">${esc(text)}</text></g>`;
+  }).join('');
   const chart = !shown.length ? '' : svg(H + 6, `${vlines(H)}${grid((tall ? [0, 2, 4, 6, 8, 10] : [0, 5, 10]).map((v) => [v, String(v)]), yS)}${marks}
-    ${shown.map(([k, , w, style]) => line(k, yS, w, style)).join('')}`, 'flow-chart');
+    ${shown.map(([k, , w, style]) => line(k, yS, w, style)).join('')}${notes}`, 'flow-chart');
 
   // 2. 잠 (0~12시간)
-  const SH = tall ? 90 : 54, yZ = (m) => 4 + (1 - Math.min(m, 720) / 720) * (SH - 8);
+  const SH = tall ? 58 : 54, yZ = (m) => 4 + (1 - Math.min(m, 720) / 720) * (SH - 8);
   const sleep = itemOn('sleep') && on('sleep') ? `<div class="yrow"><span>${T('수면')}</span></div>${svg(SH, `${vlines(SH)}${grid((tall ? [0, 3, 6, 9, 12] : [0, 6, 12]).map((h) => [h * 60, String(h)]), yZ)}${line('sleep', yZ, 2, 'style="stroke:var(--ink)"')}`)}` : '';
 
   // 3. 증상 줄: 위의 선들과 같은 말투로, 단계(0~4)를 부드러운 선과 그 아래 옅은 면으로 그린다. 높이 솟은 곳이 심했던 때다.
   // 스트레스·불안은 늘 있고, 나머지는 이 기간에 한 번이라도 있었을 때만.
   // (칸마다 네모를 놓고 진하기나 높이로 구분해 봤는데 못생겼다고 함, 2026-11-27.)
-  const SH2 = tall ? 34 : 24, yL = (v) => SH2 - 1.5 - (v / 4) * (SH2 - 4);
+  const SH2 = tall ? 30 : 24, yL = (v) => SH2 - 1.5 - (v / 4) * (SH2 - 4);
   const pickLine = pick == null ? '' : `<line x1="${cx(pick).toFixed(1)}" x2="${cx(pick).toFixed(1)}" y1="0" y2="${SH2}" style="stroke:var(--muted)"/>`;
   const strip = (name, levelOf) => {
     const d = smoothPath(cols.map((c, i) => [cx(i), yL(levelOf(c) || 0)]));

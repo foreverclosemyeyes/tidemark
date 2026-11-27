@@ -491,6 +491,13 @@ function seed() {
   await page.emulateMedia({ media: 'screen' });
   await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
   check('인쇄가 끝나면 종이용 한 장을 비움', (await page.innerHTML('#printout')) === '');
+  // 기분이 갑자기 내려간 날에 메모가 있으면 종이의 그래프에 짧게 줄여 띄운다 (조금 내려간 날, 메모가 없는 날은 안 띄운다)
+  const day = (i, mood, note = '') => [dayAgo(i), { date: dayAgo(i), mood, note }];
+  await put({ version: 3, entries: Object.fromEntries([day(6, 8), day(5, 4, '회사에서 발표를 망쳤다. 그래서 하루 종일 누워 있었음'), day(4, 7), day(3, 6, '조금 피곤'), day(2, 8), day(1, 3), day(0, 7)]), meds: [], taken: {}, settings: { hintClosed: true } });
+  await page.click('[data-tab=clinic]');
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  check('기분이 뚝 떨어진 날의 메모만 그래프에 짧게 뜸', (await page.$$('#printout .flow-note')).length === 1 && (await page.textContent('#printout .flow-note text')) === '회사에서 발표를 망쳤다');
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
   await page.click('[data-tab=today]');
 
   // 처음 쓰는 사람: 오늘 화면에 이 앱이 무엇인지 한 줄이 있고, 예시 요약을 볼 수 있다. 예시는 저장되지 않는다.
