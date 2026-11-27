@@ -14,7 +14,7 @@ import { clinicView, standalone, trend, ui } from './state.js';
 import { CARE_ITEMS } from './constants.js';
 import { careOn, careUnasked, db, save } from './store.js';
 import { applyFont, applyTheme, themeQuery } from './theme.js';
-import { clinicData, clinicDays, clinicSince, openAiKey, openLog, summaryText } from './views/clinic.js';
+import { aiHtml, clinicData, clinicDays, clinicSince, openAiKey, openLog, summaryText } from './views/clinic.js';
 import { notesListHtml, openNotes } from './views/notes.js';
 import { SLIDERS, cafHead, fxHtml, medsHtml, psychHtml, openRecord, saveEntry, sleepHtml, syncForm } from './views/record.js';
 import { printoutHtml } from './views/printout.js';
@@ -182,16 +182,23 @@ const actions = {
   aiKeyOpen: openAiKey,
   aiKeySave: () => { setAiKey($('#ai-key').value.trim()); ui.aiError = ''; closeSheet(); render(); },
   aiKeyDel: () => { setAiKey(''); ui.aiError = ''; closeSheet(); render(); },
-  aiRun: async () => {
+  // 큰 단추는 앱에 정리해 둔 근거 노트로 바로 쓰게 하고(글이 써지는 대로 보인다), 아래 작은 줄은 웹에서 새로 찾아보며 받는다(느리다)
+  aiRun: async (el) => {
     if (ui.aiBusy) return;
-    ui.aiBusy = true; ui.aiError = '';
+    const search = el.dataset.search === '1';
+    ui.aiBusy = search ? 'search' : 'notes'; ui.aiError = '';
     render();
+    // 써지는 글을 그 자리에만 그린다 (화면 전체를 다시 그리면 읽던 자리가 흔들린다). 너무 자주 그리지 않게 묶는다.
+    let live = '', timer = 0;
+    const draw = () => { timer = 0; const box = $('#ai-live'); if (box) { box.hidden = false; box.innerHTML = aiHtml(live, true); } };
+    const onText = (text) => { live = text; if (!timer) timer = setTimeout(draw, 250); };
     // 기다리는 몇 분 동안 화면이 저절로 꺼지면 요청이 끊기므로, 되는 기기에서는 화면을 켜 둔다
     let awake = null;
     try { awake = await navigator.wakeLock.request('screen'); } catch (e) { /* 못 쓰는 기기에서는 그냥 둔다 */ }
-    const r = await askAi();
+    const r = await askAi({ search, onText });
+    clearTimeout(timer);
     if (awake) awake.release().catch(() => {});
-    ui.aiBusy = false;
+    ui.aiBusy = '';
     ui.aiError = r.ok ? '' : r.error;
     if (ui.tab === 'clinic' && !sheetOpen()) render();
   },

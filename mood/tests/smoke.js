@@ -579,6 +579,35 @@ function seed() {
   let aiReply = { status: 200, body: { model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: '' }, { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: 'bipolar guideline' } },
     { type: 'text', text: '## 한눈에\n최근 2주는 기분이 높았어요.\n- 11/20 기분 8 <b>굵게</b>\n## 진료 때 말하거나 물어볼 것\n- 잠이 줄어든 것은 ' },
     { type: 'text', text: '지침에서도 눈여겨보라고 해요.', citations: [{ type: 'web_search_result_location', url: 'https://www.nice.org.uk/guidance/example', title: 'Example guideline 2025', cited_text: 'x' }, { type: 'web_search_result_location', url: 'javascript:alert(1)', title: 'bad' }] }] } };
+  await page.click('[data-act=aiKeyOpen]');
+  check('API 키 화면에 만드는 법이 순서대로 적혀 있고 콘솔로 가는 줄이 있음', (await page.$$('#sheet .steps li')).length === 5 && (await page.getAttribute('#sheet a.li >> nth=0', 'href')) === 'https://platform.claude.com/settings/keys');
+  await page.fill('#ai-key', 'sk-ant-test-123'); await page.click('[data-act=aiKeySave]'); await page.waitForTimeout(300);
+  check('키를 넣으면 AI 분석 단추가 생기고, 키는 기록과 따로 저장됨', !!(await page.$('[data-act=aiRun]')) && aiCalls.length === 0 && !JSON.stringify(await store()).includes('sk-ant-test')
+    && (await page.evaluate(() => localStorage.getItem('tide.aikey'))) === 'sk-ant-test-123');
+  // 큰 단추: 앱에 정리해 둔 근거 노트를 같이 보내고, 글이 써지는 대로 흘려 받는다 (웹 검색 없음)
+  const sse = (events) => events.map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join('');
+  const delta = (text) => ({ type: 'content_block_delta', index: 1, delta: { type: 'text_delta', text } });
+  await page.route('https://api.anthropic.com/**', (route) => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    aiCalls.push({ headers: req.headers(), body: JSON.parse(req.postData()) });
+    return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'text/event-stream' }, body: sse([{ type: 'message_start', message: {} },
+      { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: '생각' } }, delta('## 한눈에\n노트로 쓴 풀이예요.\n## 진료 때 말하거나 물어볼 것\n- 잠 이야'), delta('기를 해 보세요.'),
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' } }, { type: 'message_stop' }]) });
+  });
+  await page.click('[data-act=aiRun]'); await page.waitForSelector('.card.ai .ai-date');
+  const noteCall = aiCalls.pop().body;
+  check('큰 단추는 웹 검색 없이 근거 노트를 같이 보내고 흘려 받음', noteCall.stream === true && noteCall.tools === undefined && noteCall.system.includes('[근거 노트') && !/web_search/.test(noteCall.system) && noteCall.fallbacks === 'default' && noteCall.messages[0].content.includes('[날마다의 기록]'));
+  check('흘려 받은 글 조각이 이어져 풀이로 뜨고, 바탕이 된 자료 목록이 붙음', (await text('.card.ai')).includes('잠 이야기를 해 보세요.') && !(await text('.card.ai')).includes('생각') && (await text('.card.ai')).includes('앱에 정리해 둔')
+    && (await page.$$('.ai-refs .ai-src a')).length >= 10 && (await page.evaluate(() => JSON.parse(localStorage.getItem('tide.ai')).refs)).length > 0 && !(await page.$('#ai-live')));
+  // 받다가 끊기면(끝났다는 신호가 없음) 받은 데까지 보여 주고 그렇다고 밝힌다
+  await page.unroute('https://api.anthropic.com/**');
+  await page.route('https://api.anthropic.com/**', (route) => (route.request().method() === 'OPTIONS' ? route.fulfill({ status: 204, headers: cors })
+    : route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'text/event-stream' }, body: sse([delta('## 한눈에\n여기까지만')]) })));
+  await page.click('[data-act=aiRun]'); await page.waitForSelector('.card.ai .ai-date');
+  check('받다가 끊기면 받은 데까지 보여 주고 끊겼다고 알림', (await text('.card.ai')).includes('여기까지만') && (await text('.card.ai')).includes('연결이 끊겨서'));
+  await page.unroute('https://api.anthropic.com/**');
+  // 아래 작은 줄: 웹에서 새로 찾아보며 받는다 (느린 길)
   await page.route('https://api.anthropic.com/**', async (route) => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
@@ -586,18 +615,13 @@ function seed() {
     await new Promise((done) => setTimeout(done, 250));   // 기다리는 동안의 화면을 볼 수 있게 조금 늦게 답한다
     return route.fulfill({ status: aiReply.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(aiReply.body) });
   });
-  await page.click('[data-act=aiKeyOpen]');
-  check('API 키 화면에 만드는 법이 순서대로 적혀 있고 콘솔로 가는 줄이 있음', (await page.$$('#sheet .steps li')).length === 5 && (await page.getAttribute('#sheet a.li >> nth=0', 'href')) === 'https://platform.claude.com/settings/keys');
-  await page.fill('#ai-key', 'sk-ant-test-123'); await page.click('[data-act=aiKeySave]'); await page.waitForTimeout(300);
-  check('키를 넣으면 AI 분석 단추가 생기고, 키는 기록과 따로 저장됨', !!(await page.$('[data-act=aiRun]')) && aiCalls.length === 0 && !JSON.stringify(await store()).includes('sk-ant-test')
-    && (await page.evaluate(() => localStorage.getItem('tide.aikey'))) === 'sk-ant-test-123');
-  await page.click('[data-act=aiRun]');
+  await page.click('[data-act=aiRun][data-search]');
   await page.waitForSelector('[data-act=aiRun][disabled]');
   const busyHint = (await text('#app')).includes('이 화면을 그대로 열어 두세요');
-  await page.waitForSelector('.card.ai');
+  await page.waitForSelector('.card.ai > .ai-src');
   const call = aiCalls[0] || { headers: {}, body: { messages: [{ content: '' }] } };
   check('분석을 기다리는 동안 화면을 열어 두라고 알려 줌', busyHint);
-  check('누르면 내 키로 Claude를 한 번 부름 (브라우저 직접 호출 머리말, 모델, 기록 본문)', aiCalls.length === 1 && call.headers['x-api-key'] === 'sk-ant-test-123' && call.headers['anthropic-dangerous-direct-browser-access'] === 'true'
+  check('웹에서 찾아보기를 누르면 내 키로 Claude를 한 번 부름 (브라우저 직접 호출 머리말, 모델, 기록 본문)', aiCalls.length === 1 && call.headers['x-api-key'] === 'sk-ant-test-123' && call.headers['anthropic-dangerous-direct-browser-access'] === 'true'
     && call.headers['anthropic-version'] === '2026-10-21' && call.body.model === 'claude-opus-5-5' && call.body.fallbacks === 'default' && call.body.tools[0].type === 'web_search_20260209' && call.body.tools[0].max_uses === 6 && /정신건강의학과/.test(call.body.system) && /검색어에는 일반적인 주제어만/.test(call.body.system) && call.body.messages[0].content.includes('[날마다의 기록]') && call.body.messages[0].content.includes('기분 '));
   check('받은 풀이가 제목·목록으로 보이고, 글 속의 태그는 글자 그대로 나옴', (await page.$$('.card.ai h3')).length === 3 && (await page.$$('.card.ai li')).length === 3 && !(await page.$('.card.ai li b')) && (await text('.card.ai')).includes('<b>굵게</b>'));
   check('출처가 달린 글 조각이 한 문장으로 이어지고, AI가 단 자료가 목록으로 나옴 (http 주소만)', (await text('.card.ai')).includes('잠이 줄어든 것은 지침에서도 눈여겨보라고 해요.') && (await page.$$('.ai-src a')).length === 1
@@ -616,12 +640,12 @@ function seed() {
     paused = false;
     return route.fulfill({ status: aiReply.status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(body) });
   });
-  await page.click('[data-act=aiRun]'); await page.waitForFunction(() => !document.querySelector('[data-act=aiRun]').disabled);
+  await page.click('[data-act=aiRun][data-search]'); await page.waitForFunction(() => !document.querySelector('[data-act=aiRun]').disabled);
   check('검색하다 멈춘 응답은 이어서 한 번 더 부름', aiCalls.length === 3 && aiCalls[2].body.messages.length === 2 && aiCalls[2].body.messages[1].role === 'assistant' && aiCalls[2].body.messages[1].content[0].id === 'srvtoolu_9' && (await text('.card.ai')).includes('최근 2주는'));
   await page.reload(); await page.waitForSelector('h1'); await page.click('[data-tab=clinic]');
   check('받은 풀이는 다시 열어도 남아 있음', (await text('.card.ai')).includes('최근 2주는 기분이 높았어요'));
   aiReply = { status: 401, body: { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } } };
-  await page.click('[data-act=aiRun]'); await page.waitForSelector('.card.hint');
+  await page.click('[data-act=aiRun][data-search]'); await page.waitForSelector('.card.hint');
   check('키가 틀리면 쉬운 말로 알려 주고 앞서 받은 풀이는 그대로', (await text('#app')).includes('API 키가 맞지 않아요') && (await text('.card.ai')).includes('최근 2주는'));
   await page.click('[data-act=aiKeyOpen]'); await page.click('[data-act=aiKeyDel]'); await page.waitForTimeout(300);
   check('키를 지우면 키와 받은 풀이가 함께 지워짐', !(await page.$('[data-act=aiRun]')) && !(await page.$('.card.ai')) && (await page.evaluate(() => localStorage.getItem('tide.aikey') === null && localStorage.getItem('tide.ai') === null)));

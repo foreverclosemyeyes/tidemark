@@ -2,8 +2,9 @@
 import { today } from './dates.js';
 
 // ---------- 화면 상태 ----------
+// aiBusy: AI 분석을 받는 중이면 'notes'(근거 노트로) 또는 'search'(웹에서 찾아보며), 아니면 ''
 // medGroup: 약을 더할 때 고른 종류 (없으면 ''), demo: 흐름 화면에서 예시 기록을 보고 있는지, setTab: 설정에서 보고 있는 탭, welcome: 처음 안내의 몇째 장인지 (안 떠 있으면 null), aiBusy: AI 분석을 받는 중인지, aiError: 마지막 AI 분석이 실패한 까닭
-export const ui = { tab: 'today', selected: today(), draft: null, addingMed: false, medGroup: '', demo: false, setTab: 'rec', welcome: null, aiBusy: false, aiError: '' };
+export const ui = { tab: 'today', selected: today(), draft: null, addingMed: false, medGroup: '', demo: false, setTab: 'rec', welcome: null, aiBusy: '', aiError: '' };
 export const standalone = () => window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
 
 // ---------- 흐름 화면 (mode: 'week' | 'month' | 'half' | 'year', pick: 고른 칸) ----------

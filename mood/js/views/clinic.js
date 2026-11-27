@@ -7,6 +7,7 @@ import { durText, md, parse, today } from '../dates.js';
 import { app, esc, sheet, showSheet } from '../dom.js';
 import { F, T } from '../i18n.js';
 import { IC } from '../icons.js';
+import { REFS_SOURCES } from '../refs.js';
 import { clinicView, ui } from '../state.js';
 import { customDefs, db } from '../store.js';
 import { settingsButton } from './settings.js';
@@ -87,7 +88,8 @@ const tr = (cells, head) => `<div class="tr${head ? ' th' : ''}">${cells.map((c)
 
 // AI가 쓴 글을 화면에 옮긴다: "## " 로 시작하는 줄은 제목, "- " 로 시작하는 줄은 목록, 나머지는 문단. 글자는 전부 그대로 보여 준다 (HTML로 읽지 않는다).
 // "진료 때 말하거나 물어볼 것" 아래의 줄에는 "말할 것"에 더하는 단추가 붙는다 (이미 더한 줄은 ✓).
-function aiHtml(text) {
+// plain: 받는 중에 보여 줄 때는 단추를 붙이지 않는다
+export function aiHtml(text, plain) {
   const mine = clinicData().notes;
   let html = '', list = false, talk = false;
   const close = () => { if (list) { html += '</ul>'; list = false; } };
@@ -96,12 +98,14 @@ function aiHtml(text) {
     if (!l.startsWith('- ')) { close(); html += `<p>${esc(l)}</p>`; return; }
     if (!list) { html += `<ul${talk ? ' class="ai-talk"' : ''}>`; list = true; }
     const item = l.slice(2), short = item.slice(0, TALK_MAX);
-    html += !talk ? `<li>${esc(item)}</li>` : `<li><span>${esc(item)}</span>${mine.includes(short) ? '<i>✓</i>'
+    html += !talk || plain ? `<li>${esc(item)}</li>` : `<li><span>${esc(item)}</span>${mine.includes(short) ? '<i>✓</i>'
       : `<button type="button" class="mini" data-act="aiTalkAdd" data-t="${esc(short)}" aria-label="${T('진료 때 말할 것에 더하기')}">+</button>`}</li>`;
   });
   close();
   return html;
 }
+
+const srcLi = (x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a><small>${esc(x.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}</small></li>`;
 
 export function viewClinic() {
   const c = clinicData(), pick = clinicPick(), state = recentState(), changes = medChanges(), out = aiResult();
@@ -150,19 +154,24 @@ export function viewClinic() {
       <p>${T('진단이 아니에요. 진료 때 보여 주며 이야기해 보세요.')}</p></section>` : ''}
 
     <div class="sec">${T('AI 분석')}</div>
-    ${aiKey() ? `<button class="btn" data-act="aiRun"${ui.aiBusy ? ' disabled' : ''}>${ui.aiBusy ? T('기록을 읽고 자료를 찾는 중이에요… 2~4분 걸려요') : out ? T('AI 분석 다시 받기') : T('AI 분석 받기')}</button>
+    ${aiKey() ? `<button class="btn" data-act="aiRun"${ui.aiBusy ? ' disabled' : ''}>${ui.aiBusy === 'search' ? T('기록을 읽고 자료를 찾는 중이에요… 2~4분 걸려요') : ui.aiBusy ? T('기록을 읽고 있어요… 곧 글이 써지기 시작해요') : out ? T('AI 분석 다시 받기') : T('AI 분석 받기')}</button>
     ${ui.aiBusy ? `<p class="mut">${T('끝날 때까지 이 화면을 그대로 열어 두세요. 다른 앱으로 가거나 화면이 꺼지면 끊겨요.')}</p>` : ''}
+    ${ui.aiBusy === 'notes' ? '<section class="card ai" id="ai-live" style="margin-top:12px" hidden></section>' : ''}
     ${ui.aiError ? `<section class="card hint" style="margin-top:12px"><div>${esc(ui.aiError)}</div></section>` : ''}
-    ${out ? `<section class="card ai" style="margin-top:12px"><div class="ai-date">${F('{0}에 받은 분석', md(parse(out.date)))}</div>${aiHtml(out.text)}
+    ${out && !ui.aiBusy ? `<section class="card ai" style="margin-top:12px"><div class="ai-date">${F('{0}에 받은 분석', md(parse(out.date)))}</div>${aiHtml(out.text)}
       ${out.cut ? `<p class="mut">${T('글이 길어서 여기서 잘렸어요.')}</p>` : ''}
-      ${(out.sources || []).length ? `<h3>${T('AI가 근거로 단 자료')}</h3><ul class="ai-src">${out.sources.map((x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a><small>${esc(x.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}</small></li>`).join('')}</ul>`
-      : `<p class="mut">${out.searched ? T('웹에서 자료를 찾아봤지만 글에 단 출처는 없어요.') : T('이번 분석은 최신 자료를 찾아보지 않고 AI가 아는 범위에서 쓴 거예요.')}</p>`}</section>` : ''}` : ''}
+      ${out.broken ? `<p class="mut">${T('받는 중에 연결이 끊겨서 여기까지만 받았어요.')}</p>` : ''}
+      ${out.refs ? `<p class="mut">${F('앱에 정리해 둔 진료 지침 · 문헌고찰 요약({0} 확인)을 바탕으로 썼어요. 그 뒤에 바뀐 내용은 들어 있지 않아요.', out.refs)}</p>
+      <details class="ai-refs"><summary>${F('바탕이 된 자료 {0}개 보기', REFS_SOURCES.length)}</summary><ul class="ai-src">${REFS_SOURCES.map(srcLi).join('')}</ul></details>` :
+      (out.sources || []).length ? `<h3>${T('AI가 근거로 단 자료')}</h3><ul class="ai-src">${out.sources.map(srcLi).join('')}</ul>`
+      : `<p class="mut">${out.searched ? T('웹에서 자료를 찾아봤지만 글에 단 출처는 없어요.') : T('이번 분석은 최신 자료를 찾아보지 않고 AI가 아는 범위에서 쓴 거예요.')}</p>`}</section>` : ''}
+    ${ui.aiBusy ? '' : `<button class="textbtn" data-act="aiRun" data-search="1">${T('웹에서 최신 자료를 새로 찾아보며 받기 (2~4분)')}</button>`}` : ''}
     <section class="card list" style="margin-top:12px">
       <button class="li add" data-act="aiKeyOpen">${IC.spark}&nbsp; ${aiKey() ? T('API 키 바꾸기 · 지우기') : T('AI 분석을 쓰려면 API 키 넣기')}</button>
       <button class="li add" data-act="copyAi">${IC.note}&nbsp; ${T('AI에게 물어볼 글 복사 (최근 8주)')}</button>
     </section>
     <p class="secnote">${T('“AI 분석 받기”를 누르면 최근 6달의 기록과 메모가 Anthropic(Claude)으로 전송되고, AI가 기록 전체를 읽고 쓴 풀이가 여기에 떠요. 누를 때만 전송돼요. 내 API 키로 부르는 것이라 한 번에 몇백 원쯤 들어요.')}
-      ${T('쓰기 전에 AI가 웹에서 최근 진료 지침과 연구를 찾아보고, 근거로 삼은 자료를 아래에 적어 줘요. 그래서 2~4분쯤 걸려요.')}
+      ${T('최근 진료 지침과 문헌고찰을 미리 확인해 앱에 정리해 둔 요약을 AI가 같이 읽고 써요. 웹에서 새로 찾아보게 할 수도 있는데, 그러면 2~4분쯤 걸려요.')}
       ${T('AI는 의사가 아니에요. 정신과 진료 지식을 바탕으로 읽으라고 시켰을 뿐이라, 풀이는 진단이 아니고 틀릴 수 있어요. 진료 때 이야기할 거리로 써 주세요.')}</p>
     <p class="foot">${DISCLAIMER}</p>`;
 }
