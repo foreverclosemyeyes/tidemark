@@ -107,6 +107,8 @@ export function tilesHtml(e) {
 // 오늘의 나머지 항목들. 설정에서 켜 둔 항목은 적었든 안 적었든 늘 줄로 있고, 꺼 둔 항목은 없다
 // (한때 안 적은 항목을 맨 아래 "+ 이름" 딱지로 모았는데, 매번 딱지를 눌러 더해야 해서 불편하다고 했다. 길면 설정에서 끄면 된다, 2026-11-17).
 // 줄을 누르면 그 항목 하나만 고치는 화면이 열린다. 생리는 누르면 바로 켜지고 꺼지며, 공황은 안 적은 날에 누르면 바로 한 번이 적힌다.
+// 생리를 한 번이라도 적은 사람에게는 적지 않은 날을 "아님"으로 보여 준다 (날마다 "아님"을 적게 하지 않으려고. 사용자가 정함, 2026-11-27)
+const everPeriod = () => Object.values(db.entries).some((x) => x.period);
 export function detailHtml(e) {
   const signs = SIGNS.filter(([k]) => e.signs && e.signs[k]).map(([, label]) => label);
   // 저장된 약 목록에 없는 약(목록에서 지운 약)만 여기 글로 보여 준다. 나머지는 위 약 카드에 있다.
@@ -119,7 +121,7 @@ export function detailHtml(e) {
     ...SYMPTOMS.map(([k, label]) => [k, itemOn(k), label, label, e[k] == null ? '' : `${LEVELS[e[k]]}${bars(e[k])}`]),
     ['panic', itemOn('panic'), T('공황'), T('공황'), e.panic ? F('{0}번', e.panic) : ''],
     ['psy', itemOn('psy'), T('정신병적 증상'), T('정신병적 증상'), esc(psyNames(e.psych).join(' · ')) || (e.psy ? LEVELS[e.psy] : '')],
-    ['period', itemOn('period'), `${IC.drop}${T('생리')}`, T('생리'), e.period ? T('생리 중') : ''],
+    ['period', itemOn('period'), `${IC.drop}${T('생리')}`, T('생리'), e.period ? T('생리 중') : everPeriod() ? T('아님') : ''],
     ['appetite', itemOn('appetite'), `${IC.fork}${T('식욕')}`, T('식욕'), e.appetite == null ? '' : ten('appetite', e.appetite)],
     ['caffeine', itemOn('caffeine'), `${IC.coffee}${T('카페인')}`, T('카페인'), caffeine],
     ...customDefs().map((c) => [`c:${c.id}`, true, esc(c.name), esc(c.name), esc(customText(c, (e.custom || {})[c.id]))]),

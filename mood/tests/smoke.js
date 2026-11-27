@@ -130,9 +130,9 @@ function seed() {
   // 3. 오늘 화면에서 약 체크: 하루에 여러 번, 시각만 지우기, 기록 지우기
   await page.click('#app [data-act=doseAdd]');
   check('한 번 더 먹은 것 추가', (await store()).entries[today].meds.length === 2);
-  await page.click('#app [data-act=doseTime] >> nth=1');
+  await page.fill('#app [data-dose] >> nth=1', '');
   e = (await store()).entries[today];
-  check('시각을 누르면 시각만 지워짐', e.meds.length === 2 && e.meds[1].at === '' && e.meds[0].at !== '', JSON.stringify(e.meds));
+  check('시각을 지우면 시각만 지워짐', e.meds.length === 2 && e.meds[1].at === '' && e.meds[0].at !== '', JSON.stringify(e.meds));
   await page.click('#app [data-act=doseDel] >> nth=0');
   e = (await store()).entries[today];
   check('먹은 기록 지우기', e.meds.length === 1 && e.meds[0].at === '', JSON.stringify(e.meds));
@@ -198,10 +198,13 @@ function seed() {
   await put({ version: 2, entries: {}, meds: [{ name: '브린텔릭스', dose: '15mg' }], taken: {}, settings: { hintClosed: true } });
   await page.click('#app [data-act=doseAdd]');
   check('처음 누르면 시각이 찍힘', /^\d\d:\d\d$/.test((await store()).taken[today][0].at));
-  await page.click('#app [data-act=doseTime]');
-  check('한 번 더 누르면 시각이 사라지고 먹음만 남음', (await store()).taken[today][0].at === '' && (await text('#app .dose')).includes('먹음'));
-  await page.click('#app [data-act=doseTime]');
-  check('또 누르면 시각이 다시 들어감', /^\d\d:\d\d$/.test((await store()).taken[today][0].at));
+  await page.fill('#app [data-dose]', '07:40');
+  check('시각을 눌러 먹은 시각을 고침', (await store()).taken[today][0].at === '07:40' && (await text('#app .dose')).includes('7:40'));
+  await page.fill('#app [data-dose]', '');
+  check('시각을 지우면 먹음만 남음', (await store()).taken[today][0].at === '' && (await text('#app .dose')).includes('먹음'));
+  await put({ version: 3, entries: { [dayAgo(3)]: { date: dayAgo(3), mood: 5, period: true } }, meds: [], taken: {}, settings: { hintClosed: true } });
+  check('생리를 적은 적이 있으면 안 적은 날은 "아님"으로 보임', /생리\s*아님/.test(await text('#app')));
+  await put({ version: 2, entries: {}, meds: [{ name: '브린텔릭스', dose: '15mg' }], taken: {}, settings: { hintClosed: true } });
 
   // 5. 쌓인 기록: 흐름 한 장 · 진료
   check('아래 탭은 오늘 · 흐름 · 진료 세 개 (인사이트 탭은 없음)', (await page.$$eval('.tabbar button', (els) => els.map((x) => x.dataset.tab).join())) === 'today,trend,clinic');

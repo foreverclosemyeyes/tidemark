@@ -5,7 +5,7 @@ import { $, app, closeSheet, copyText, enterApp, sheet, sheetOpen, toTop, toast 
 import { exportData, giveFile, hasAlarms, importData, makeIcs, remind, snoozeBackup } from './files.js';
 import { F, T } from './i18n.js';
 import { lockNow, removePin, setPin } from './lock.js';
-import { addDose, medKey, medsFor, normDose, setMeds, sugHtml, toggleDoseTime } from './meds.js';
+import { addDose, medKey, medsFor, normDose, setMeds, sugHtml } from './meds.js';
 import { askAi, setAiKey } from './ai.js';
 import { countVisit } from './count.js';
 import { render } from './render.js';
@@ -59,7 +59,6 @@ const actions = {
   color: (el) => { db.settings.color = el.dataset.colorPick; save(); applyTheme(); render(); openSettings(); },
   theme: (el) => { db.settings.theme = el.dataset.themePick; save(); applyTheme(); render(); openSettings(); },
   doseAdd: (el) => { const list = doseList(); addDose(list, el.dataset.med); commitDoses(list); },
-  doseTime: (el) => { const list = doseList(); toggleDoseTime(list[Number(el.dataset.i)]); commitDoses(list); },
   doseDel: (el) => { const list = doseList(); list.splice(Number(el.dataset.i), 1); commitDoses(list); },
   ics: async () => {
     if (!hasAlarms()) { toast(T('알림 시간을 먼저 정해 주세요')); return; }
@@ -368,6 +367,15 @@ sheet.addEventListener('input', (ev) => {
 });
 
 // 진료 탭: 다음 진료일을 고르면 바로 저장, 말할 것은 엔터로도 추가
+// 약 먹은 시각을 고른다 (오늘 화면과 기록 화면 둘 다). 시각을 지우면 "먹음"만 남는다.
+document.addEventListener('change', (ev) => {
+  const i = ev.target.dataset.dose;
+  if (i == null) return;
+  const list = doseList();
+  if (!list[i]) return;
+  list[i].at = ev.target.value;
+  commitDoses(list);
+});
 app.addEventListener('change', (ev) => {
   if (ev.target.id !== 'c-next') return;
   clinicData().next = ev.target.value;

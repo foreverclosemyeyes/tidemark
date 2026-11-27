@@ -24,9 +24,6 @@ export function addDose(list, key) {
   // 처음 체크할 때는 지금 시각이 같이 찍힌다
   if (m) list.push({ name: m.name, dose: m.dose, at: nowTime() });
 }
-// 시각을 누르면 시각만 지워지고, '✓ 먹음'을 누르면 지금 시각이 다시 들어간다
-export const toggleDoseTime = (dose) => { dose.at = dose.at ? '' : nowTime(); };
-
 // 전날 안정제·수면제를 먹었거나, 당일 새벽(06시 전)에 먹었으면 그날 밤 잠은 '약 먹고 잔 밤'으로 본다
 const sedative = (m) => SEDATIVE_GENERICS.includes((CATALOG.find(([ko, , en]) => ko === m.name || en === m.name) || [])[1]);
 export const aided = (e) => medsFor(addDays(e.date, -1)).some(sedative)
@@ -41,16 +38,16 @@ export function medsText(list) {
 
 // 약마다 한 줄: 먹은 기록들과 '먹었어요' 버튼. 오늘 화면과 기록 화면이 같이 쓴다.
 // 한 번 먹은 것까지는 한 줄에 들어가서 줄 높이가 안 바뀐다. 두 번째부터 아래 줄로 내려간다.
-// 먹은 기록은 시각(누르면 시각이 지워짐) 또는 '✓ 먹음'(누르면 지금 시각이 들어감)으로 보인다.
+// 먹은 기록은 시각 또는 '✓ 먹음'(시각 없음)으로 보이고, 누르면 시각을 고르는 창이 떠서 먹은 시각을 고치거나 지울 수 있다
+// (보이는 글자 위에 투명한 시각 입력 칸을 겹쳐 둔다. 누르면 시각이 지워지기만 하던 것을 사용자가 고칠 수 있게 해 달라고 함, 2026-11-27).
 export function doseRowsHtml(list) {
   const all = db.meds.concat(list.filter((m, i) => !db.meds.some((x) => medKey(x) === medKey(m)) && list.findIndex((y) => medKey(y) === medKey(m)) === i));
   return all.map((m) => {
     const key = medKey(m), doses = list.map((x, i) => [x, i]).filter(([x]) => medKey(x) === key);
     return `<div class="li med-row${doses.length > 1 ? ' multi' : ''}">
       <span class="lk">${IC.pill}<span class="mn">${esc(m.name)}${m.dose ? `<small>${esc(m.dose)}</small>` : ''}</span></span>
-      <span class="doses">${doses.map(([x, i]) => `<span class="dose">${x.at
-    ? `<button type="button" class="dose-now" data-act="doseTime" data-i="${i}" aria-label="${T('시각 지우기')}">${ampm(x.at)}</button>`
-    : `<button type="button" class="dose-now" data-act="doseTime" data-i="${i}" aria-label="${T('시각 넣기')}">✓ ${T('먹음')}</button>`}
+      <span class="doses">${doses.map(([x, i]) => `<span class="dose"><label class="dose-now">${x.at ? ampm(x.at) : `✓ ${T('먹음')}`}
+          <input type="time" data-dose="${i}" value="${esc(x.at || '')}" aria-label="${T('먹은 시각 고치기')}"></label>
         <button type="button" data-act="doseDel" data-i="${i}" aria-label="${T('삭제')}">✕</button></span>`).join('')}
         ${doses.length ? `<button type="button" class="take more" data-act="doseAdd" data-med="${esc(key)}" aria-label="${T('한 번 더')}">+</button>`
     : `<button type="button" class="take" data-act="doseAdd" data-med="${esc(key)}">${T('먹었어요')}</button>`}</span>
